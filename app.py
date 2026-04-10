@@ -64,6 +64,45 @@ def run_download(job_id, url, format_choice, format_id):
             target = [f for f in files if f.endswith(".mp4")]
             chosen = target[0] if target else files[0]
 
+        if format_choice == "gif":
+            gif_out = os.path.splitext(chosen)[0] + ".gif"
+
+            # Cap duration to keep GIF size and encode time reasonable
+            MAX_GIF_DURATION = 60
+            try:
+                probe = subprocess.run(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                     "-of", "default=noprint_wrappers=1:nokey=1", chosen],
+                    capture_output=True, text=True, timeout=30,
+                )
+                duration = float(probe.stdout.strip()) if probe.stdout.strip() else 0.0
+            except (subprocess.TimeoutExpired, ValueError, OSError):
+                duration = 0.0
+
+            if duration > MAX_GIF_DURATION:
+                job["status"] = "error"
+                job["error"] = f"Video is too long for GIF conversion (max {MAX_GIF_DURATION}s)"
+                return
+
+            ffmpeg_cmd = [
+                "ffmpeg", "-y", "-i", chosen,
+                "-vf", "fps=15,scale=w='min(480,iw)':h=-2:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse",
+                gif_out
+            ]
+            try:
+                ff_res = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300)
+                if ff_res.returncode != 0:
+                    job["status"] = "error"
+                    last_line = ff_res.stderr.strip().split("\n")[-1] if ff_res.stderr.strip() else ""
+                    job["error"] = last_line or "Failed to create GIF"
+                    return
+            except subprocess.TimeoutExpired:
+                job["status"] = "error"
+                job["error"] = "GIF conversion timed out (5 min limit)"
+                return
+            chosen = gif_out
+            files.append(gif_out)
+
         for f in files:
             if f != chosen:
                 try:
