@@ -10,6 +10,15 @@ app = Flask(__name__)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+# Path to yt-dlp (use Homebrew version which has YouTube fixes)
+YT_DLP_PATH = os.environ.get("YT_DLP_PATH", "/opt/homebrew/bin/yt-dlp")
+
+# Browser for yt-dlp cookie extraction (set to empty string to disable)
+COOKIES_BROWSER = os.environ.get("COOKIES_BROWSER", "brave")
+
+# Build --cookies-from-browser args if configured
+COOKIE_ARGS = ["--cookies-from-browser", COOKIES_BROWSER] if COOKIES_BROWSER else []
+
 jobs = {}
 
 
@@ -33,7 +42,9 @@ def run_download(job_id, url, format_choice, format_id):
     job = jobs[job_id]
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
-    cmd = ["yt-dlp", "--no-playlist", "-o", out_template]
+    cmd = [YT_DLP_PATH, "--no-playlist", "-o", out_template]
+    cmd += COOKIE_ARGS
+    cmd += ["--extractor-retries", "3", "--retries", "5"]
 
     if format_choice == "audio":
         cmd += ["-x", "--audio-format", "mp3"]
@@ -101,7 +112,7 @@ def get_info():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    cmd = ["yt-dlp", "--no-playlist", "-j", url]
+    cmd = [YT_DLP_PATH, "--no-playlist"] + COOKIE_ARGS + ["-j", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
