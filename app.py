@@ -4,6 +4,7 @@ import glob
 import json
 import subprocess
 import threading
+from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_file, render_template
 
 app = Flask(__name__)
@@ -11,6 +12,20 @@ DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 jobs = {}
+
+
+def is_safe_url(url):
+    """Reject anything that isn't a plain http(s) URL.
+
+    This also blocks strings starting with ``-``/``--`` which yt-dlp would
+    otherwise parse as CLI options (e.g. ``--exec``), letting a caller
+    smuggle arbitrary flags into the subprocess invocation.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
 def parse_ytdlp_json(stdout):
@@ -42,7 +57,10 @@ def run_download(job_id, url, format_choice, format_id):
     else:
         cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
 
-    cmd.append(url)
+    # "--" stops yt-dlp from treating a URL that begins with "-" as an
+    # option (e.g. "--exec=..."), which would otherwise allow arbitrary
+    # command execution.
+    cmd += ["--", url]
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -100,8 +118,10 @@ def get_info():
     url = data.get("url", "").strip()
     if not url:
         return jsonify({"error": "No URL provided"}), 400
+    if not is_safe_url(url):
+        return jsonify({"error": "Invalid URL"}), 400
 
-    cmd = ["yt-dlp", "--no-playlist", "-j", url]
+    cmd = ["yt-dlp", "--no-playlist", "-j", "--", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
@@ -146,8 +166,10 @@ def get_playlist_info():
     url = data.get("url", "").strip()
     if not url:
         return jsonify({"error": "No URL provided"}), 400
+    if not is_safe_url(url):
+        return jsonify({"error": "Invalid URL"}), 400
 
-    cmd = ["yt-dlp", "--flat-playlist", "-J", url]
+    cmd = ["yt-dlp", "--flat-playlist", "-J", "--", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
@@ -173,6 +195,8 @@ def start_download():
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
+    if not is_safe_url(url):
+        return jsonify({"error": "Invalid URL"}), 400
 
     job_id = uuid.uuid4().hex[:10]
     jobs[job_id] = {"status": "downloading", "url": url, "title": title}
