@@ -57,6 +57,34 @@ YouTube, TikTok, Instagram, Twitter/X, Reddit, Facebook, Vimeo, Twitch, Dailymot
 - **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/)
 - **Dependencies:** 2 (Flask, yt-dlp)
 
+## Security
+
+reclip has no login system by default — anyone who can reach the server can
+trigger downloads. That's fine for `127.0.0.1`-only local use, but if you
+expose it on your network or the internet, turn on these optional controls:
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `RECLIP_API_KEY` | unset (disabled) | If set, all `/api/*` requests must send a matching `X-API-Key: <key>` header. |
+| `RECLIP_RATE_LIMIT` | `20` | Max requests per client IP per window on `/api/info` and `/api/playlist` (download uses a stricter limit). |
+| `RECLIP_RATE_WINDOW` | `60` | Rate-limit window, in seconds. |
+| `RECLIP_TRUST_PROXY` | unset (disabled) | Set to `1` only if reclip sits behind a proxy *you control* that sets `X-Forwarded-For`, so rate limiting keys on the real client IP instead of the proxy's. |
+
+Additional built-in protections (always on, no config needed):
+
+- **CSRF / cross-site request blocking** — state-changing `/api/*` requests are rejected unless their `Origin`/`Referer` matches the server's own host, preventing a third-party web page from silently triggering downloads through a user's browser.
+- **Rate limiting** — an in-memory, per-IP sliding-window limiter throttles the `yt-dlp`-invoking endpoints (`/api/info`, `/api/playlist`, `/api/download`) to reduce abuse and resource exhaustion.
+
+Example:
+
+```bash
+RECLIP_API_KEY=$(openssl rand -hex 32) ./reclip.sh
+```
+
+Then include `X-API-Key: <key>` on every request (the bundled web UI does not
+currently prompt for one, so this mode is intended for API/script usage or a
+reverse proxy that injects the header).
+
 ## Disclaimer
 
 This tool is intended for personal use only. Please respect copyright laws and the terms of service of the platforms you download from. The developers are not responsible for any misuse of this tool.

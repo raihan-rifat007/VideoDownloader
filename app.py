@@ -2,8 +2,14 @@ import os
 import uuid
 import glob
 import json
+import time
+import hmac
 import subprocess
 import threading
+from collections import defaultdict, deque
+from functools import wraps
+from urllib.parse import urlparse
+
 from flask import Flask, request, jsonify, send_file, render_template
 
 app = Flask(__name__)
@@ -11,6 +17,112 @@ DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 jobs = {}
+
+# --- Security configuration --------------------------------------------
+# All of these are optional / off-by-default so the "just run it" quick
+# start keeps working, but can be turned on when exposing reclip beyond
+# localhost (see README "Security" section).
+
+# If set, every /api/* request must send a matching `X-API-Key` header.
+API_KEY = os.environ.get("RECLIP_API_KEY", "").strip()
+
+# Set RECLIP_TRUST_PROXY=1 only if reclip is running behind a proxy you
+# control that sets X-Forwarded-For itself (otherwise clients could spoof
+# their rate-limit identity).
+TRUST_PROXY = os.environ.get("RECLIP_TRUST_PROXY", "") == "1"
+
+RATE_LIMIT_MAX = int(os.environ.get("RECLIP_RATE_LIMIT", "20"))
+RATE_LIMIT_WINDOW = int(os.environ.get("RECLIP_RATE_WINDOW", "60"))
+
+_rate_lock = threading.Lock()
+_rate_buckets = defaultdict(deque)
+
+
+def _client_ip():
+    if TRUST_PROXY:
+        forwarded = request.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+def rate_limited(max_requests=None, window=None):
+    """Simple in-memory sliding-window rate limiter, keyed by client IP + route.
+
+    Intentionally dependency-free (no Flask-Limiter) to keep the project's
+    "2 dependencies" footprint. Good enough for a single-process, self-hosted
+    app; not meant to survive a restart or scale across workers.
+    """
+    limit = RATE_LIMIT_MAX if max_requests is None else max_requests
+    win = RATE_LIMIT_WINDOW if window is None else window
+
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            key = f"{_client_ip()}:{request.path}"
+            now = time.monotonic()
+            with _rate_lock:
+                bucket = _rate_buckets[key]
+                while bucket and now - bucket[0] > win:
+                    bucket.popleft()
+                if len(bucket) >= limit:
+                    retry_after = int(max(0, win - (now - bucket[0]))) + 1
+                    resp = jsonify({"error": "Too many requests. Please slow down."})
+                    resp.status_code = 429
+                    resp.headers["Retry-After"] = str(retry_after)
+                    return resp
+                bucket.append(now)
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def require_api_key(fn):
+    """If RECLIP_API_KEY is configured, require a matching X-API-Key header."""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if API_KEY:
+            supplied = request.headers.get("X-API-Key", "")
+            if not supplied or not hmac.compare_digest(supplied, API_KEY):
+                return jsonify({"error": "Unauthorized"}), 401
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+def _same_origin(value):
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return False
+    return bool(parsed.scheme and parsed.netloc) and parsed.netloc == request.host
+
+
+@app.before_request
+def csrf_protect():
+    """Block cross-site state-changing requests.
+
+    reclip has no login/session, so the real risk isn't classic session
+    CSRF — it's a third-party web page silently POSTing to a user's
+    locally-bound reclip instance (e.g. http://localhost:8899/api/download)
+    to trigger downloads/SSRF-style requests on their behalf. Browsers
+    always send Origin (and usually Referer) on cross-origin fetch/POST,
+    so rejecting mismatches blocks that path while leaving same-origin
+    page usage and non-browser API clients (curl, scripts) unaffected.
+    """
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return None
+    if not request.path.startswith("/api/"):
+        return None
+
+    source = request.headers.get("Origin") or request.headers.get("Referer")
+    if not source:
+        # No browser-supplied Origin/Referer: non-browser client. Rely on
+        # the API key / rate limiting below rather than blocking it.
+        return None
+
+    if not _same_origin(source):
+        return jsonify({"error": "Cross-site request blocked"}), 403
+    return None
 
 
 def parse_ytdlp_json(stdout):
@@ -95,6 +207,8 @@ def index():
 
 
 @app.route("/api/info", methods=["POST"])
+@rate_limited(max_requests=30, window=60)
+@require_api_key
 def get_info():
     data = request.json
     url = data.get("url", "").strip()
@@ -141,6 +255,8 @@ def get_info():
 
 
 @app.route("/api/playlist", methods=["POST"])
+@rate_limited(max_requests=30, window=60)
+@require_api_key
 def get_playlist_info():
     data = request.json
     url = data.get("url", "").strip()
@@ -164,6 +280,8 @@ def get_playlist_info():
 
 
 @app.route("/api/download", methods=["POST"])
+@rate_limited(max_requests=10, window=60)
+@require_api_key
 def start_download():
     data = request.json
     url = data.get("url", "").strip()
@@ -185,6 +303,7 @@ def start_download():
 
 
 @app.route("/api/status/<job_id>")
+@require_api_key
 def check_status(job_id):
     job = jobs.get(job_id)
     if not job:
@@ -197,6 +316,7 @@ def check_status(job_id):
 
 
 @app.route("/api/file/<job_id>")
+@require_api_key
 def download_file(job_id):
     job = jobs.get(job_id)
     if not job or job["status"] != "done":
