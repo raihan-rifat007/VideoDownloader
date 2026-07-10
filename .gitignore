@@ -8,3 +8,6 @@ assets/*.mov
 .env.local
 .env.production
 .env.development
+build/
+dist/
+*.egg-info/

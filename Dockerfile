@@ -19,7 +19,7 @@ RUN useradd -m -u 1000 reclip && \
     chown -R reclip:reclip /app
 USER reclip
 
-# Put the reclip user's --user installs first so startup yt-dlp updates take effect.
+# Keep user-installed commands on PATH; Python also loads the user-site yt-dlp update.
 ENV PATH=/home/reclip/.local/bin:$PATH
 
 EXPOSE 8899
