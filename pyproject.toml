@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reclip"
+version = "0.2.0"
+description = "Self-hosted media downloader with a web UI and an agent-friendly CLI"
+requires-python = ">=3.8"
+dependencies = ["flask", "yt-dlp"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+reclip = "cli:main"
+
+[tool.setuptools]
+py-modules = ["core", "cli", "app"]
