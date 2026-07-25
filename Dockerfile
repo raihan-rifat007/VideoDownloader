@@ -16,9 +16,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# PySocks lets requests-based tools honor an optional SOCKS5 ALL_PROXY value.
-# The proxy URL is supplied only at build/runtime, never baked into the image.
-
 COPY . .
 
 RUN useradd -m -u 1000 reclip && \

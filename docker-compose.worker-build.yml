@@ -1,0 +1,6 @@
+services:
+  asr-worker:
+    image: reclip-asr-worker:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.worker

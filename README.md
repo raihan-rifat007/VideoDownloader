@@ -40,22 +40,6 @@ If Docker Desktop storage has been relocated, pass the new VHDX path so the free
 
 Do not invoke the worker build Compose file directly or start a second worker build while the wrapper is running. If the wrapper reports an abandoned build lock, run `docker buildx history ls` and retry only after it shows no `Running` build.
 
-### Optional SOCKS5 proxy
-
-To use a SOCKS5 proxy listening on Windows at `127.0.0.1:1080`, set this in `.env`:
-
-```env
-RECLIP_PROXY=socks5h://host.docker.internal:1080
-RECLIP_NO_PROXY=127.0.0.1,localhost,::1
-```
-
-`host.docker.internal` is required because `127.0.0.1` inside a container refers to that container. The Compose setting covers package downloads in Dockerfile `RUN` steps, startup yt-dlp updates, URL acquisition, and Hugging Face model downloads. Proxy values are passed as build arguments rather than baked into either image.
-
-Docker image pulls and Dockerfile remote `ADD` operations use Docker Desktop's own proxy path. To proxy those too, open **Docker Desktop > Settings > Resources > Proxies** and configure `socks5://127.0.0.1:1080`. Docker Desktop documents direct SOCKS5 proxy configuration as a Business-subscription feature. If that option is unavailable, use an HTTP proxy/bridge accepted by Docker Desktop.
-
-The local `.env` in this workspace is ignored by Git, so proxy settings or credentials are not committed.
-
-
 Explicit CPU mode:
 
 ```powershell

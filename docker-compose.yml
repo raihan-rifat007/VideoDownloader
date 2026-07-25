@@ -5,9 +5,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        ALL_PROXY: ${RECLIP_PROXY:-}
-        NO_PROXY: ${RECLIP_NO_PROXY:-127.0.0.1,localhost,::1}
     image: reclip-web:latest
     container_name: reclip-web
     ports:
@@ -18,8 +15,6 @@ services:
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-21474836480}
       WORKER_STALE_SECONDS: ${WORKER_STALE_SECONDS:-30}
       RECLIP_NO_UPDATE: ${RECLIP_NO_UPDATE:-}
-      ALL_PROXY: ${RECLIP_PROXY:-}
-      NO_PROXY: ${RECLIP_NO_PROXY:-127.0.0.1,localhost,::1}
     volumes:
       - reclip-downloads:/app/downloads
       - reclip-data:/data
@@ -48,8 +43,6 @@ services:
       RECLIP_NO_UPDATE: ${RECLIP_NO_UPDATE:-}
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
-      ALL_PROXY: ${RECLIP_PROXY:-}
-      NO_PROXY: ${RECLIP_NO_PROXY:-127.0.0.1,localhost,::1}
     volumes:
       - reclip-data:/data
       - whisper-models:/models
