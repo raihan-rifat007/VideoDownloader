@@ -1,13 +1,64 @@
+name: reclip-asr
+
 services:
-  reclip:
-    build: .
-    image: reclip:latest
-    container_name: reclip
+  reclip-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: reclip-web:latest
+    container_name: reclip-web
     ports:
-      - "8899:8899"
+      - "127.0.0.1:8899:8899"
+    environment:
+      DATA_DIR: /data
+      ASR_DB_PATH: /data/reclip.sqlite3
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-21474836480}
+      WORKER_STALE_SECONDS: ${WORKER_STALE_SECONDS:-30}
+      RECLIP_NO_UPDATE: ${RECLIP_NO_UPDATE:-}
     volumes:
       - reclip-downloads:/app/downloads
+      - reclip-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8899/', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    init: true
+    restart: unless-stopped
+
+  asr-worker:
+    image: reclip-asr-worker:latest
+    pull_policy: never
+    container_name: reclip-asr-worker
+    environment:
+      DATA_DIR: /data
+      ASR_DB_PATH: /data/reclip.sqlite3
+      ASR_WORKER_ID: reclip-asr-worker
+      ASR_DEVICE: ${ASR_DEVICE:-cuda}
+      ASR_COMPUTE_TYPE: ${ASR_COMPUTE_TYPE:-int8_float16}
+      ASR_CPU_COMPUTE_TYPE: int8
+      WHISPER_MODEL_DIR: /models
+      DEEPFILTER_CACHE_DIR: /cache/deepfilter
+      RECLIP_NO_UPDATE: ${RECLIP_NO_UPDATE:-}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - reclip-data:/data
+      - whisper-models:/models
+      - deepfilter-cache:/cache
+    gpus: all
+    healthcheck:
+      test: ["CMD", "python", "-m", "reclip_asr.worker", "--healthcheck"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 30s
     restart: unless-stopped
 
 volumes:
   reclip-downloads:
+  reclip-data:
+  whisper-models:
+  deepfilter-cache:

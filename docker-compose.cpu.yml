@@ -1,0 +1,8 @@
+services:
+  asr-worker:
+    gpus: !reset []
+    environment:
+      ASR_DEVICE: cpu
+      ASR_COMPUTE_TYPE: int8
+      NVIDIA_VISIBLE_DEVICES: void
+      NVIDIA_DRIVER_CAPABILITIES: ""

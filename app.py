@@ -5,8 +5,11 @@ import json
 import subprocess
 import threading
 from flask import Flask, request, jsonify, send_file, render_template
+from reclip_asr.api import init_asr
+from reclip_asr.utils import validate_public_url
 
 app = Flask(__name__)
+init_asr(app)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
@@ -100,6 +103,10 @@ def get_info():
     url = data.get("url", "").strip()
     if not url:
         return jsonify({"error": "No URL provided"}), 400
+    try:
+        url = validate_public_url(url)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     cmd = ["yt-dlp", "--no-playlist", "-j", url]
     try:
@@ -147,6 +154,10 @@ def get_playlist_info():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
+    try:
+        url = validate_public_url(url)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     cmd = ["yt-dlp", "--flat-playlist", "-J", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
@@ -175,6 +186,10 @@ def start_download():
         return jsonify({"error": "No URL provided"}), 400
 
     job_id = uuid.uuid4().hex[:10]
+    try:
+        url = validate_public_url(url)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     jobs[job_id] = {"status": "downloading", "url": url, "title": title}
 
     thread = threading.Thread(target=run_download, args=(job_id, url, format_choice, format_id))
