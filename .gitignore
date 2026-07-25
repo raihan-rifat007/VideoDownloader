@@ -1,7 +1,11 @@
 venv/
 downloads/
+data/
 __pycache__/
 *.pyc
+.pytest_cache/
+.coverage
+htmlcov/
 assets/*.mov
 .DS_Store
 .env
