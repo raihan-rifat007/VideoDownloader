@@ -17,8 +17,13 @@ from download_plan import (
     validate_final_file,
     validate_resume_plan,
 )
-from download_process import DeadlineTracker, run_streaming_process
-from job_store import JobStore
+from download_process import (
+    DeadlineTracker,
+    ProcessCancelled,
+    ProcessStopError,
+    run_streaming_process,
+)
+from job_store import DOWNLOAD_ACTIVE_STATES, JobStore
 from progress import normalize_download_progress, parse_progress_line
 
 
@@ -67,6 +72,10 @@ def load_video_info(source_url: str) -> dict[str, Any]:
     raise ValueError("Media information was empty")
 
 
+class CancelUnavailableError(RuntimeError):
+    """The requested attempt is active in storage but has no local control."""
+
+
 class JobService:
     def __init__(
         self,
@@ -94,6 +103,8 @@ class JobService:
         self.idle_timeout = idle_timeout
         self.process_timeout = process_timeout
         self.max_attempt_seconds = max_attempt_seconds
+        self._attempt_controls: dict[tuple[str, int], threading.Event] = {}
+        self._control_lock = threading.RLock()
 
     def create(self, request_data: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(request_data, dict):
@@ -149,7 +160,7 @@ class JobService:
 
     def resume(self, job_id: str) -> dict[str, Any]:
         job = self._require_job(job_id)
-        if job["state"] not in {"failed", "interrupted"}:
+        if job["state"] not in {"failed", "interrupted", "cancelled"}:
             raise RuntimeError("Job cannot be resumed in its current state")
         current_plan = resolve_plan(
             job["source_url"],
@@ -163,6 +174,35 @@ class JobService:
             raise RuntimeError("Job changed before it could be resumed")
         self._start_attempt(job_id, attempt_no, job["resource_json"])
         return {"job_id": job_id, "attempt_no": attempt_no}
+
+    def cancel(self, job_id: str, attempt_no: int) -> dict[str, Any]:
+        if not isinstance(attempt_no, int) or isinstance(attempt_no, bool) or attempt_no <= 0:
+            raise ValueError("Invalid attempt number")
+        job = self._require_job(job_id)
+        state = job["state"]
+        if state in {"cancelled", "cancelling"} and job["attempt_no"] == attempt_no:
+            return self.status(job_id)
+        if state in {"cancelled", "cancelling"}:
+            raise RuntimeError("Job changed before it could be cancelled")
+        if state not in DOWNLOAD_ACTIVE_STATES:
+            raise RuntimeError("Job cannot be cancelled in its current state")
+        if job["attempt_no"] != attempt_no:
+            raise RuntimeError("Job changed before it could be cancelled")
+
+        key = (job_id, attempt_no)
+        with self._control_lock:
+            cancel_event = self._attempt_controls.get(key)
+        if cancel_event is None:
+            raise CancelUnavailableError("Active download control is unavailable")
+
+        if not self.store.request_cancel(job_id, attempt_no):
+            current = self._require_job(job_id)
+            if current["state"] in {"cancelling", "cancelled"}:
+                return self.status(job_id)
+            raise RuntimeError("Job changed before it could be cancelled")
+
+        cancel_event.set()
+        return self.status(job_id)
 
     def restart(self, job_id: str) -> dict[str, Any]:
         job = self._require_job(job_id)
@@ -183,6 +223,7 @@ class JobService:
             "preparing": "downloading",
             "downloading": "downloading",
             "processing": "downloading",
+            "cancelling": "downloading",
             "completed": "done",
             "failed": "error",
             "interrupted": "error",
@@ -192,6 +233,8 @@ class JobService:
             "preparing": "preparing",
             "downloading": "downloading",
             "processing": "processing",
+            "cancelling": "cancelling",
+            "cancelled": "cancelled",
             "completed": "complete",
             "failed": "failed",
             "interrupted": "interrupted",
@@ -207,10 +250,12 @@ class JobService:
             "phase": phase,
             "progress": job["progress_json"],
             "last_progress": job["last_progress_json"],
-            "can_retry": job["state"] in {"failed", "interrupted"},
-            "resume_candidate": job["state"] in {"failed", "interrupted"}
+            "can_retry": job["state"] in {"failed", "interrupted", "cancelled"},
+            "resume_candidate": job["state"] in {"failed", "interrupted", "cancelled"}
             and bool(job["resource_json"]),
             "resume_result": "unknown",
+            "job_id": job["job_id"],
+            "can_cancel": job["state"] in DOWNLOAD_ACTIVE_STATES,
         }
 
     def list_jobs(self, limit: int = 50, cursor: str | None = None) -> dict[str, Any]:
@@ -246,9 +291,23 @@ class JobService:
             raise
 
     def recover(self) -> dict[str, Any]:
-        return self.store.recover_active_jobs(self.runtime_epoch)
+        result = self.store.recover_active_jobs(self.runtime_epoch)
+        if result.get("restart_required"):
+            raise RuntimeError("Service restart required before recovering active jobs")
+        return result
 
-    def run_attempt(self, job_id: str, attempt_no: int, plan: dict[str, Any]) -> None:
+    def run_attempt(
+        self,
+        job_id: str,
+        attempt_no: int,
+        plan: dict[str, Any],
+        cancel_event: threading.Event | None = None,
+    ) -> None:
+        if cancel_event is None:
+            with self._control_lock:
+                cancel_event = self._attempt_controls.get((job_id, attempt_no))
+            if cancel_event is None:
+                cancel_event = threading.Event()
         task_dir = self._task_dir(job_id)
         command = build_download_command(plan, task_dir)
         final_path: str | None = None
@@ -263,6 +322,8 @@ class JobService:
 
         def handle_line(line: str) -> None:
             nonlocal final_path, last_persisted
+            if cancel_event.is_set():
+                return
             event = parse_progress_line(line)
             if event is None:
                 if line.startswith("ERROR:") or line.startswith("WARNING:"):
@@ -279,18 +340,21 @@ class JobService:
                 if data.get("status") == "downloading":
                     progress = normalize_download_progress(data, now)
                     if now - last_persisted >= 2.0:
-                        self.store.update_attempt(
+                        updated = self.store.update_attempt(
                             job_id,
                             attempt_no,
                             {"state": "downloading", "progress_json": progress},
+                            expected_states=DOWNLOAD_ACTIVE_STATES,
                         )
-                        last_persisted = now
+                        if updated:
+                            last_persisted = now
                 elif data.get("status") == "finished":
                     progress = normalize_download_progress(data, now)
                     self.store.update_attempt(
                         job_id,
                         attempt_no,
                         {"state": "processing", "progress_json": None, "last_progress_json": progress},
+                        expected_states=DOWNLOAD_ACTIVE_STATES,
                     )
                     last_persisted = now
             elif event["kind"] == "postprocess":
@@ -298,6 +362,7 @@ class JobService:
                     job_id,
                     attempt_no,
                     {"state": "processing", "progress_json": None},
+                    expected_states=DOWNLOAD_ACTIVE_STATES,
                 )
 
         try:
@@ -306,7 +371,11 @@ class JobService:
                 handle_line,
                 timeout_seconds=self.max_attempt_seconds,
                 deadline_tracker=deadline_tracker,
+                cancel_event=cancel_event,
             )
+            if cancel_event.is_set():
+                self._cancelled(job_id, attempt_no, returncode)
+                return
             if returncode != 0:
                 self._fail(
                     job_id,
@@ -319,6 +388,9 @@ class JobService:
             if final_path is None:
                 self._fail(job_id, attempt_no, "final_file_missing", "Download completed without a final file", returncode)
                 return
+            if cancel_event.is_set():
+                self._cancelled(job_id, attempt_no, returncode)
+                return
             result = validate_final_file(
                 task_dir,
                 final_path,
@@ -328,37 +400,80 @@ class JobService:
             final_relpath = (Path("jobs") / job_id / result["relative_path"]).as_posix()
             complete_progress = _empty_progress()
             complete_progress["percent"] = 100.0
-            if not self.store.update_attempt(
+            if cancel_event.is_set():
+                self._cancelled(job_id, attempt_no, returncode)
+                return
+            if not self.store.finalize_attempt(
                 job_id,
                 attempt_no,
+                "completed",
                 {
-                    "state": "completed",
                     "progress_json": complete_progress,
                     "final_relpath": final_relpath,
                     "filename": result["filename"],
                 },
-            ):
-                return
-            self.store.finish_attempt(job_id, attempt_no, "completed", returncode)
+                returncode,
+            ) and cancel_event.is_set():
+                self._cancelled(job_id, attempt_no, returncode)
+        except ProcessCancelled as exc:
+            if cancel_event.is_set():
+                self._cancelled(job_id, attempt_no, exc.exit_code)
+            else:
+                self._fail(job_id, attempt_no, "download_failed", "Download failed", exc.exit_code)
         except subprocess.TimeoutExpired as exc:
-            reason = getattr(exc, "reason", "attempt_timeout")
-            self._fail(job_id, attempt_no, reason, f"Download timed out ({reason})", None)
+            if cancel_event.is_set():
+                self._cancelled(job_id, attempt_no, None)
+            else:
+                reason = getattr(exc, "reason", "attempt_timeout")
+                self._fail(job_id, attempt_no, reason, f"Download timed out ({reason})", None)
         except (OSError, ValueError) as exc:
-            self._fail(job_id, attempt_no, "download_failed", str(exc)[:1000], None)
+            if cancel_event.is_set():
+                self._cancelled(job_id, attempt_no, None)
+            else:
+                self._fail(job_id, attempt_no, "download_failed", str(exc)[:1000], None)
+        except ProcessStopError:
+            if not cancel_event.is_set():
+                self._fail(job_id, attempt_no, "download_failed", "Unable to stop download process", None)
         except Exception:
-            self._fail(job_id, attempt_no, "download_failed", "Download failed", None)
+            if cancel_event.is_set():
+                self._cancelled(job_id, attempt_no, None)
+            else:
+                self._fail(job_id, attempt_no, "download_failed", "Download failed", None)
+        finally:
+            self._remove_attempt_control(job_id, attempt_no, cancel_event)
 
     def _start_attempt(self, job_id: str, attempt_no: int, plan: dict[str, Any]) -> None:
         try:
+            cancel_event = threading.Event()
+            with self._control_lock:
+                self._attempt_controls[(job_id, attempt_no)] = cancel_event
             thread = self.thread_factory(
                 target=self.run_attempt,
-                args=(job_id, attempt_no, plan),
+                args=(job_id, attempt_no, plan, cancel_event),
                 name=f"reclip-download-{job_id}",
                 daemon=True,
             )
             thread.start()
         except Exception:
+            with self._control_lock:
+                self._attempt_controls.pop((job_id, attempt_no), None)
             self._fail(job_id, attempt_no, "thread_start_failed", "Download could not be started", None)
+
+    def _remove_attempt_control(
+        self, job_id: str, attempt_no: int, cancel_event: threading.Event
+    ) -> None:
+        with self._control_lock:
+            if self._attempt_controls.get((job_id, attempt_no)) is cancel_event:
+                self._attempt_controls.pop((job_id, attempt_no), None)
+
+    def _cancelled(self, job_id: str, attempt_no: int, exit_code: int | None) -> bool:
+        return self.store.finalize_attempt(
+            job_id,
+            attempt_no,
+            "cancelled",
+            {"progress_json": None},
+            exit_code,
+        )
 
     def _fail(
         self,
@@ -367,18 +482,18 @@ class JobService:
         error_code: str,
         message: str,
         exit_code: int | None,
-    ) -> None:
-        self.store.update_attempt(
+    ) -> bool:
+        return self.store.finalize_attempt(
             job_id,
             attempt_no,
+            "failed",
             {
-                "state": "failed",
                 "progress_json": None,
                 "error_code": error_code,
                 "error_message": message,
             },
+            exit_code,
         )
-        self.store.finish_attempt(job_id, attempt_no, "failed", exit_code)
 
     def _require_job(self, job_id: str) -> dict[str, Any]:
         if not isinstance(job_id, str) or not reclip_job_id(job_id):
@@ -411,7 +526,8 @@ class JobService:
             "error": job["error_message"],
             "progress": job["progress_json"],
             "last_progress": job["last_progress_json"],
-            "can_retry": job["state"] in {"failed", "interrupted"},
+            "can_retry": job["state"] in {"failed", "interrupted", "cancelled"},
+            "can_cancel": job["state"] in DOWNLOAD_ACTIVE_STATES,
         }
 
 

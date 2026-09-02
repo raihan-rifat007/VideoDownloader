@@ -26,6 +26,14 @@ class FakeApiService:
         self.calls.append(("restart", job_id))
         return {"job_id": "b" * 32, "attempt_no": 1}
 
+    def cancel(self, job_id, attempt_no):
+        self.calls.append(("cancel", job_id, attempt_no))
+        return {
+            "job_id": job_id,
+            "attempt_no": attempt_no,
+            "state": "cancelling",
+        }
+
     def delete(self, job_id):
         self.calls.append(("delete", job_id))
 
@@ -64,10 +72,23 @@ class JobsApiTests(unittest.TestCase):
             self.assertEqual(self.client.get(f"/api/status/{job_id}").status_code, 200)
             self.assertEqual(self.client.post(f"/api/jobs/{job_id}/resume").status_code, 202)
             self.assertEqual(self.client.post(f"/api/jobs/{job_id}/restart").status_code, 201)
+            cancel_response = self.client.post(
+                f"/api/jobs/{job_id}/cancel", json={"attempt_no": 3}
+            )
+            self.assertEqual(cancel_response.status_code, 202)
+            self.assertEqual(cancel_response.get_json()["state"], "cancelling")
             self.assertEqual(self.client.delete(f"/api/jobs/{job_id}").status_code, 204)
         self.assertEqual(
-            [call[0] for call in self.service.calls], ["resume", "restart", "delete"]
+            [call[0] for call in self.service.calls],
+            ["resume", "restart", "cancel", "delete"],
         )
+
+    def test_cancel_requires_an_attempt_number(self):
+        job_id = "a" * 32
+        with patch.object(app_module, "_get_job_service", return_value=self.service):
+            response = self.client.post(f"/api/jobs/{job_id}/cancel", json={})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.service.calls, [])
 
 
 if __name__ == "__main__":
