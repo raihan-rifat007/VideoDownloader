@@ -17,7 +17,9 @@ https://github.com/user-attachments/assets/419d3e50-c933-444b-8cab-a9724986ba05
 - Bulk downloads — paste multiple URLs at once
 - Automatic URL deduplication
 - Clean, responsive UI — no frameworks, no build step
-- Single Python file backend (~150 lines)
+- Live download progress, speed, size and ETA
+- Resumable task records for interrupted downloads
+- Cancel active downloads while preserving their partial files for later continuation
 
 ## Quick Start
 
@@ -28,13 +30,16 @@ cd reclip
 ./reclip.sh
 ```
 
-Open **http://localhost:8899**.
+Open **http://127.0.0.1:8899**.
 
 Or with Docker:
 
 ```bash
-docker build -t reclip . && docker run -p 8899:8899 reclip
+docker compose up --build -d
 ```
+
+The Compose configuration publishes the service on `127.0.0.1:8899`, so it is
+available only on the local computer by default.
 
 ## Usage
 
@@ -44,6 +49,44 @@ docker build -t reclip . && docker run -p 8899:8899 reclip
 4. Select quality/resolution if available
 5. Click **Download** on individual videos, or **Download All**
 
+Completed files are presented using the media title, for example
+`熊猫的一天.mp4` or `熊猫的一天.mp3`. ReClip keeps its internal task files
+under the task directory for resumable downloads; the title is used for the
+browser-facing download name. Titles are sanitized for the current platform,
+and a task ID suffix is used when no usable title is available. If the same
+name already exists on your computer, the final duplicate-name behavior is
+controlled by your browser.
+
+### Interrupted downloads
+
+Downloads are stored under the Docker volume mounted at `/app/downloads`.
+Task records and resumable media are kept in `.reclip/jobs.sqlite3` and
+`.reclip/jobs/<job_id>/`. If a download fails or the container is restarted,
+open the page again and use **Continue** on the interrupted task. ReClip checks
+the saved media identity before asking yt-dlp to reuse its partial files.
+
+Continuation depends on the source and media protocol. If the source changes,
+does not support byte ranges or no longer exposes the selected format, ReClip
+will refuse to append to the old task; use **Restart** to create a new task.
+The application does not automatically start interrupted downloads after a
+container restart. Completed files can be saved again from the task list.
+
+### Cancelling downloads
+
+Click **Cancel** on an active task to stop its current downloader process. The
+task first shows **Cancelling** while ReClip confirms that the process and its
+children have stopped; only then is it marked **Cancelled**. Partial files and
+the last known progress are preserved, and no completed file is published.
+
+For a cancelled task, **Continue** creates the next attempt in the same task
+and asks yt-dlp to reuse compatible partial files. **Restart** creates a new
+task from the original URL. **Delete** removes the task record and its task
+directory after confirmation.
+
+Task history now retains the source URL, title and partial files until the task
+is explicitly deleted. Do not expose this local service to the public network;
+the first version has no user authentication.
+
 ## Supported Sites
 
 Anything [yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), including:
@@ -52,10 +95,10 @@ YouTube, TikTok, Instagram, Twitter/X, Reddit, Facebook, Vimeo, Twitch, Dailymot
 
 ## Stack
 
-- **Backend:** Python + Flask (~150 lines)
+- **Backend:** Python + Flask with a SQLite task store
 - **Frontend:** Vanilla HTML/CSS/JS (single file, no build step)
 - **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/)
-- **Dependencies:** 2 (Flask, yt-dlp)
+- **Dependencies:** Flask, yt-dlp, ffmpeg and the Python standard library
 
 ## Disclaimer
 
