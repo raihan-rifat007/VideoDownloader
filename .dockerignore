@@ -1,6 +1,10 @@
 .git
 .gitignore
 downloads
+venv
+.venv
+tests
+.superpowers
 __pycache__
 *.pyc
 *.pyo
