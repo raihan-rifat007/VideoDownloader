@@ -10,10 +10,15 @@ from pathlib import Path
 from typing import Any
 
 
+SCHEMA_VERSION = 2
+
+
 JOB_STATES = {
     "preparing",
     "downloading",
     "processing",
+    "cancelling",
+    "cancelled",
     "completed",
     "failed",
     "interrupted",
@@ -33,6 +38,9 @@ JOB_FIELDS = {
     "filename",
     "updated_at",
 }
+
+ACTIVE_JOB_STATES = frozenset({"preparing", "downloading", "processing", "cancelling"})
+DOWNLOAD_ACTIVE_STATES = frozenset({"preparing", "downloading", "processing"})
 
 
 def _encode_json(value: Any) -> str | None:
@@ -97,9 +105,10 @@ class JobStore:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.execute("PRAGMA synchronous=FULL")
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version > 1:
+            if version > SCHEMA_VERSION:
                 raise RuntimeError(f"Unsupported jobs database schema: {version}")
-            connection.executescript(
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS jobs (
                     job_id TEXT PRIMARY KEY,
@@ -118,7 +127,11 @@ class JobStore:
                     filename TEXT,
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL
-                );
+                )
+                """
+            )
+            connection.execute(
+                """
                 CREATE TABLE IF NOT EXISTS attempts (
                     job_id TEXT NOT NULL REFERENCES jobs(job_id) ON DELETE CASCADE,
                     attempt_no INTEGER NOT NULL,
@@ -128,16 +141,28 @@ class JobStore:
                     exit_code INTEGER,
                     outcome TEXT NOT NULL,
                     PRIMARY KEY (job_id, attempt_no)
-                );
+                )
+                """
+            )
+            connection.execute(
+                """
                 CREATE TABLE IF NOT EXISTS service_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS idx_jobs_listing
-                    ON jobs (state, created_at DESC, job_id DESC);
-                PRAGMA user_version=1;
+                )
                 """
             )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_jobs_listing
+                    ON jobs (state, created_at DESC, job_id DESC)
+                """
+            )
+            connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
@@ -209,7 +234,7 @@ class JobStore:
                     record["job_id"],
                     record["attempt_no"],
                     record["created_at"],
-                    "running" if record["state"] in {"preparing", "downloading", "processing"} else record["state"],
+                    "running" if record["state"] in ACTIVE_JOB_STATES else record["state"],
                 ),
             )
             connection.commit()
@@ -288,7 +313,7 @@ class JobStore:
             if (
                 row is None
                 or row["attempt_no"] != expected_attempt
-                or row["state"] not in {"failed", "interrupted"}
+                or row["state"] not in {"failed", "interrupted", "cancelled"}
             ):
                 connection.rollback()
                 return None
@@ -323,6 +348,8 @@ class JobStore:
         job_id: str,
         attempt_no: int,
         fields: dict[str, Any],
+        *,
+        expected_states: set[str] | frozenset[str] | None = None,
     ) -> bool:
         unknown = set(fields).difference(JOB_FIELDS)
         if unknown:
@@ -331,6 +358,12 @@ class JobStore:
             return False
         if "state" in fields and fields["state"] not in JOB_STATES:
             raise ValueError("Invalid job state")
+        if expected_states is not None:
+            expected_states = set(expected_states)
+            if not expected_states:
+                return False
+            if not expected_states.issubset(JOB_STATES):
+                raise ValueError("Invalid expected job states")
         values = dict(fields)
         for field in ("resource_json", "progress_json", "last_progress_json"):
             if field in values:
@@ -342,11 +375,109 @@ class JobStore:
             connection.execute("BEGIN IMMEDIATE")
             params = [values[field] for field in values]
             params.extend((job_id, attempt_no))
+            where = "job_id=? AND attempt_no=?"
+            if expected_states is not None:
+                placeholders = ", ".join("?" for _ in expected_states)
+                where += f" AND state IN ({placeholders})"
+                params.extend(sorted(expected_states))
             cursor = connection.execute(
-                f"UPDATE jobs SET {assignments} WHERE job_id=? AND attempt_no=?",
+                f"UPDATE jobs SET {assignments} WHERE {where}",
                 params,
             )
             if cursor.rowcount != 1:
+                connection.rollback()
+                return False
+            connection.commit()
+            return True
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def request_cancel(self, job_id: str, attempt_no: int) -> bool:
+        if not isinstance(attempt_no, int) or isinstance(attempt_no, bool) or attempt_no <= 0:
+            return False
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            cursor = connection.execute(
+                """
+                UPDATE jobs
+                SET state='cancelling',
+                    last_progress_json=COALESCE(progress_json, last_progress_json),
+                    progress_json=NULL, error_code=NULL, error_message=NULL,
+                    updated_at=?
+                WHERE job_id=? AND attempt_no=?
+                  AND state IN ('preparing', 'downloading', 'processing')
+                """,
+                (time.time(), job_id, attempt_no),
+            )
+            if cursor.rowcount != 1:
+                connection.rollback()
+                return False
+            connection.commit()
+            return True
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def finalize_attempt(
+        self,
+        job_id: str,
+        attempt_no: int,
+        outcome: str,
+        fields: dict[str, Any],
+        exit_code: int | None = None,
+    ) -> bool:
+        if outcome not in {"completed", "failed", "cancelled"}:
+            raise ValueError("Invalid attempt outcome")
+        unknown = set(fields).difference(JOB_FIELDS)
+        if unknown:
+            raise ValueError(f"Unknown job fields: {sorted(unknown)}")
+        if "state" in fields and fields["state"] != outcome:
+            raise ValueError("Final job state must match attempt outcome")
+
+        now = time.time()
+        values = dict(fields)
+        values["state"] = outcome
+        values["updated_at"] = now
+        for field in ("resource_json", "progress_json", "last_progress_json"):
+            if field in values:
+                values[field] = _encode_json(values[field])
+        assignments = ", ".join(f"{field} = ?" for field in values)
+        expected_states = (
+            DOWNLOAD_ACTIVE_STATES if outcome in {"completed", "failed"} else {"cancelling"}
+        )
+        placeholders = ", ".join("?" for _ in expected_states)
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            attempt_cursor = connection.execute(
+                """
+                UPDATE attempts
+                SET finished_at=?, exit_code=?, outcome=?
+                WHERE job_id=? AND attempt_no=? AND outcome='running'
+                """,
+                (now, exit_code, outcome, job_id, attempt_no),
+            )
+            if attempt_cursor.rowcount != 1:
+                connection.rollback()
+                return False
+
+            params = [values[field] for field in values]
+            params.extend((job_id, attempt_no))
+            params.extend(sorted(expected_states))
+            job_cursor = connection.execute(
+                f"""
+                UPDATE jobs SET {assignments}
+                WHERE job_id=? AND attempt_no=? AND state IN ({placeholders})
+                """,
+                params,
+            )
+            if job_cursor.rowcount != 1:
                 connection.rollback()
                 return False
             connection.commit()
@@ -363,26 +494,55 @@ class JobStore:
         try:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
-                "SELECT job_id, attempt_no FROM jobs WHERE state IN ('preparing','downloading','processing')"
+                "SELECT job_id, attempt_no, state FROM jobs WHERE state IN (?, ?, ?, ?)",
+                tuple(sorted(ACTIVE_JOB_STATES)),
             ).fetchall()
+            previous_epoch_row = connection.execute(
+                "SELECT value FROM service_meta WHERE key='runtime_epoch'"
+            ).fetchone()
+            previous_epoch = previous_epoch_row["value"] if previous_epoch_row else None
+            if previous_epoch == runtime_epoch and rows:
+                connection.rollback()
+                return {"recovered": 0, "restart_required": True}
+
             for row in rows:
-                connection.execute(
-                    """
-                    UPDATE jobs
-                    SET state='interrupted', last_progress_json=progress_json,
-                        progress_json=NULL, error_code='service_restarted',
-                        error_message='Download interrupted by service restart', updated_at=?
-                    WHERE job_id=? AND attempt_no=?
-                    """,
-                    (now, row["job_id"], row["attempt_no"]),
-                )
-                connection.execute(
-                    """
-                    UPDATE attempts SET finished_at=?, outcome='interrupted'
-                    WHERE job_id=? AND attempt_no=? AND outcome='running'
-                    """,
-                    (now, row["job_id"], row["attempt_no"]),
-                )
+                if row["state"] == "cancelling":
+                    job_cursor = connection.execute(
+                        """
+                        UPDATE jobs
+                        SET state='cancelled', progress_json=NULL,
+                            error_code=NULL, error_message=NULL, updated_at=?
+                        WHERE job_id=? AND attempt_no=? AND state='cancelling'
+                        """,
+                        (now, row["job_id"], row["attempt_no"]),
+                    )
+                    attempt_cursor = connection.execute(
+                        """
+                        UPDATE attempts SET finished_at=?, outcome='cancelled'
+                        WHERE job_id=? AND attempt_no=? AND outcome='running'
+                        """,
+                        (now, row["job_id"], row["attempt_no"]),
+                    )
+                else:
+                    job_cursor = connection.execute(
+                        """
+                        UPDATE jobs
+                        SET state='interrupted', last_progress_json=progress_json,
+                            progress_json=NULL, error_code='service_restarted',
+                            error_message='Download interrupted by service restart', updated_at=?
+                        WHERE job_id=? AND attempt_no=?
+                        """,
+                        (now, row["job_id"], row["attempt_no"]),
+                    )
+                    attempt_cursor = connection.execute(
+                        """
+                        UPDATE attempts SET finished_at=?, outcome='interrupted'
+                        WHERE job_id=? AND attempt_no=? AND outcome='running'
+                        """,
+                        (now, row["job_id"], row["attempt_no"]),
+                    )
+                if job_cursor.rowcount != 1 or attempt_cursor.rowcount != 1:
+                    raise RuntimeError("Unable to safely recover active job")
             connection.execute(
                 """
                 INSERT INTO service_meta(key, value) VALUES('runtime_epoch', ?)
@@ -436,7 +596,7 @@ class JobStore:
             cursor = connection.execute(
                 """
                 UPDATE jobs SET state='deleting', updated_at=?
-                WHERE job_id=? AND state IN ('failed','interrupted','completed')
+                WHERE job_id=? AND state IN ('failed','interrupted','completed','cancelled')
                 """,
                 (time.time(), job_id),
             )
