@@ -20,6 +20,9 @@ class ProcessStopError(RuntimeError):
     """Raised when the process tree or output reader cannot be confirmed stopped."""
 
 
+_WINDOWS_TASKKILL_TIMEOUT = 3
+
+
 class DeadlineTracker:
     """Track preparation, useful download progress, post-processing and hard limits."""
 
@@ -108,7 +111,7 @@ def _signal_process_tree(process, process_group_id, sig, timeout):
 
 def _stop_process_and_reader(process, reader, process_group_id):
     term_ok = _signal_process_tree(
-        process, process_group_id, signal.SIGTERM, timeout=1
+        process, process_group_id, signal.SIGTERM, timeout=_WINDOWS_TASKKILL_TIMEOUT
     )
     try:
         process.wait(timeout=2)
@@ -121,7 +124,7 @@ def _stop_process_and_reader(process, reader, process_group_id):
             process,
             process_group_id,
             getattr(signal, "SIGKILL", signal.SIGTERM),
-            timeout=1,
+            timeout=_WINDOWS_TASKKILL_TIMEOUT,
         )
         try:
             process.wait(timeout=2)
