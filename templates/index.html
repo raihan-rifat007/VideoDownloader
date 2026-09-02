@@ -270,6 +270,38 @@
     .card-status.done { color: var(--success); }
     .card-status.error { color: var(--error); }
 
+    .progress-bar-wrap {
+      width: 100%;
+      height: 4px;
+      margin-top: 8px;
+      overflow: hidden;
+      border-radius: 2px;
+      background: var(--card-border);
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--accent);
+      transition: width 0.3s ease;
+    }
+    .progress-details {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      margin-top: 5px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+    }
+    .progress-bar-fill.indeterminate {
+      width: 35%;
+      animation: progress-slide 1.2s ease-in-out infinite;
+    }
+    @keyframes progress-slide {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(285%); }
+    }
+
     .q-chip {
       padding: 4px 10px;
       border: 1.5px solid var(--card-border);
@@ -407,6 +439,7 @@
     </div>
   </div>
 
+  <script src="{{ url_for('static', filename='progress.js') }}"></script>
   <script>
     let currentFormat = 'video';
     let cardData = [];
@@ -584,7 +617,23 @@
       if (c.status === 'ready') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Download</button>${qualityChips}`;
       } else if (c.status === 'downloading') {
-        actionHtml = `<span class="card-status downloading"><span class="spin"></span> Downloading...</span>`;
+        const view = ReclipProgress.progressViewModel(c, Date.now());
+        const percentText = view.percent == null ? '' : ` · ${Math.round(view.percent)}%`;
+        const progressClass = view.indeterminate ? 'progress-bar-fill indeterminate' : 'progress-bar-fill';
+        const progressStyle = view.indeterminate ? '' : ` style="width:${view.percent}%"`;
+        const progressValue = view.indeterminate ? '' : ` aria-valuenow="${view.percent}"`;
+        actionHtml = `
+          <span class="card-status downloading" aria-live="polite">
+            <span class="spin"></span> ${esc(view.phaseText)}${percentText}
+          </span>
+          <div class="progress-bar-wrap" role="progressbar" aria-label="${esc(view.phaseText)}" aria-valuemin="0" aria-valuemax="100"${progressValue}>
+            <div class="${progressClass}"${progressStyle}></div>
+          </div>
+          <div class="progress-details">
+            <span>${esc(view.sizeText)}</span>
+            <span>${esc(view.speedText)}</span>
+            <span>ETA ${esc(view.etaText)}</span>
+          </div>`;
       } else if (c.status === 'done') {
         actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
           <span class="card-status done">${esc(c.filename || '')}</span>`;
@@ -623,6 +672,10 @@
       const c = cardData[idx];
       c.status = 'downloading';
       c.error = null;
+      c.phase = 'preparing';
+      c.progress = null;
+      c.pollGeneration = (c.pollGeneration || 0) + 1;
+      const generation = c.pollGeneration;
       renderCard(idx);
 
       try {
@@ -644,7 +697,7 @@
           return;
         }
         c.jobId = data.job_id;
-        pollCard(idx);
+        pollCard(idx, generation);
       } catch (err) {
         c.status = 'error';
         c.error = err.message;
@@ -652,31 +705,46 @@
       }
     }
 
-    function pollCard(idx) {
+    function pollCard(idx, generation) {
       const c = cardData[idx];
-      const iv = setInterval(async () => {
+      const poll = async () => {
+        if (cardData[idx] !== c || c.pollGeneration !== generation) return;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
         try {
-          const res = await fetch(`/api/status/${c.jobId}`);
+          const res = await fetch(`/api/status/${c.jobId}`, { signal: controller.signal });
           const data = await res.json();
+          if (cardData[idx] !== c || c.pollGeneration !== generation) return;
           if (data.status === 'done') {
-            clearInterval(iv);
             c.status = 'done';
+            c.phase = data.phase;
+            c.progress = data.progress;
             c.filename = data.filename;
             renderCard(idx);
             saveCard(idx);
           } else if (data.status === 'error') {
-            clearInterval(iv);
             c.status = 'error';
+            c.phase = data.phase;
+            c.progress = data.progress;
             c.error = data.error;
             renderCard(idx);
+          } else {
+            c.phase = data.phase || 'downloading';
+            c.progress = data.progress;
+            renderCard(idx);
+            setTimeout(poll, 1000);
           }
         } catch {
-          clearInterval(iv);
-          c.status = 'error';
-          c.error = 'Lost connection to server';
-          renderCard(idx);
+          if (cardData[idx] === c && c.pollGeneration === generation) {
+            c.status = 'error';
+            c.error = 'Lost connection to server';
+            renderCard(idx);
+          }
+        } finally {
+          clearTimeout(timeout);
         }
-      }, 1000);
+      };
+      poll();
     }
 
     function saveCard(idx) {
