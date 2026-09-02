@@ -172,6 +172,20 @@ class ApiProgressTests(unittest.TestCase):
         self.assertEqual(payload["error"], "private diagnostic details")
         self.assertIsNone(payload["progress"])
 
+    def test_progress_asset_is_served(self):
+        response = self.client.get("/static/progress.js")
+        try:
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b"progressViewModel", response.data)
+        finally:
+            response.close()
+
+    def test_index_references_progress_asset_and_accessible_progress_bar(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"/static/progress.js", response.data)
+        self.assertIn(b"role=\"progressbar\"", response.data)
+
 
 if __name__ == "__main__":
     unittest.main()
