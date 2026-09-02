@@ -1,6 +1,8 @@
 .git
 .gitignore
 downloads
+venv
+tests
 __pycache__
 *.pyc
 *.pyo
