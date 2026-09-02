@@ -1,11 +1,16 @@
 import pathlib
+import threading
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
 
-from download_process import DeadlineTracker, run_streaming_process
+from download_process import (
+    DeadlineTracker,
+    ProcessCancelled,
+    run_streaming_process,
+)
 
 
 FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "fake_downloader.py"
@@ -106,6 +111,46 @@ class ProcessTests(unittest.TestCase):
                     [sys.executable, str(FIXTURE), "spawn-child", str(marker)],
                     lambda line: None,
                     timeout_seconds=0.2,
+                )
+            time.sleep(0.3)
+            self.assertFalse(marker.exists())
+
+    def test_precancelled_attempt_does_not_spawn(self):
+        from unittest.mock import patch
+
+        cancel_event = threading.Event()
+        cancel_event.set()
+        with patch("download_process.subprocess.Popen") as popen:
+            with self.assertRaises(ProcessCancelled):
+                run_streaming_process(
+                    [sys.executable, str(FIXTURE), "silent"],
+                    lambda line: None,
+                    cancel_event=cancel_event,
+                )
+        popen.assert_not_called()
+
+    def test_cancel_event_stops_a_silent_process(self):
+        cancel_event = threading.Event()
+        threading.Timer(0.1, cancel_event.set).start()
+        with self.assertRaises(ProcessCancelled):
+            run_streaming_process(
+                [sys.executable, str(FIXTURE), "silent"],
+                lambda line: None,
+                timeout_seconds=5,
+                cancel_event=cancel_event,
+            )
+
+    def test_cancel_event_stops_a_child_process(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = pathlib.Path(directory) / "child-finished.txt"
+            cancel_event = threading.Event()
+            threading.Timer(0.1, cancel_event.set).start()
+            with self.assertRaises(ProcessCancelled):
+                run_streaming_process(
+                    [sys.executable, str(FIXTURE), "spawn-child", str(marker)],
+                    lambda line: None,
+                    timeout_seconds=5,
+                    cancel_event=cancel_event,
                 )
             time.sleep(0.3)
             self.assertFalse(marker.exists())

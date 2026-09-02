@@ -50,3 +50,33 @@ test('restored completed card keeps the server filename', () => {
   assert.equal(card.filename, '熊猫的一天.mp4');
   assert.equal(jobs.shouldAutoSave(job, new Set()), false);
 });
+
+test('job card maps cancelling state to a non-retryable active card', () => {
+  const card = jobs.jobToCard({
+    job_id: 'a',
+    title: 'Sample',
+    format: 'video',
+    state: 'cancelling',
+    attempt_no: 1,
+    progress: null,
+  });
+  assert.equal(card.status, 'cancelling');
+  assert.equal(card.phase, 'cancelling');
+  assert.equal(card.canCancel, false);
+  assert.equal(card.canRetry, false);
+});
+
+test('job card maps cancelled state to a retryable cancelled card', () => {
+  const card = jobs.jobToCard({
+    job_id: 'a',
+    title: 'Sample',
+    format: 'video',
+    state: 'cancelled',
+    attempt_no: 1,
+    last_progress: { percent: 42 },
+  });
+  assert.equal(card.status, 'cancelled');
+  assert.equal(card.phase, 'cancelled');
+  assert.equal(card.canCancel, false);
+  assert.equal(card.canRetry, true);
+});

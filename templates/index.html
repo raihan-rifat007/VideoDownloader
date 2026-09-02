@@ -261,12 +261,16 @@
     .card-dl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .card-dl-btn.done { background: var(--success); color: #fff; }
     .card-dl-btn.error { background: var(--error); color: #fff; }
+    .card-dl-btn.cancel { background: transparent; color: var(--error); border: 1px solid rgba(196, 61, 61, 0.35); }
+    .card-dl-btn.cancel:hover { background: rgba(196, 61, 61, 0.08); }
 
     .card-status {
       font-size: 0.68rem;
       color: var(--muted);
     }
     .card-status.downloading { color: var(--accent); }
+    .card-status.cancelling { color: var(--accent); }
+    .card-status.cancelled { color: var(--muted); }
     .card-status.done { color: var(--success); }
     .card-status.error { color: var(--error); }
 
@@ -625,6 +629,7 @@
         const progressStyle = view.indeterminate ? '' : ` style="width:${view.percent}%"`;
         const progressValue = view.indeterminate ? '' : ` aria-valuenow="${view.percent}"`;
         actionHtml = `
+          <button class="card-dl-btn cancel" onclick="cancelCard(${idx})">Cancel</button>
           <span class="card-status downloading" aria-live="polite">
             <span class="spin"></span> ${esc(view.phaseText)}${percentText}
           </span>
@@ -636,9 +641,31 @@
             <span>${esc(view.speedText)}</span>
             <span>ETA ${esc(view.etaText)}</span>
           </div>`;
+      } else if (c.status === 'cancelling') {
+        const view = ReclipProgress.progressViewModel({ ...c, progress: c.lastProgress }, Date.now());
+        const percentText = view.percent == null ? '' : ` · ${Math.round(view.percent)}%`;
+        const progressClass = view.indeterminate ? 'progress-bar-fill indeterminate' : 'progress-bar-fill';
+        const progressStyle = view.indeterminate ? '' : ` style="width:${view.percent}%"`;
+        const progressValue = view.indeterminate ? '' : ` aria-valuenow="${view.percent}"`;
+        actionHtml = `
+          <span class="card-status cancelling" aria-live="polite">
+            <span class="spin"></span> Cancelling download${percentText}
+          </span>
+          <div class="progress-bar-wrap" role="progressbar" aria-label="Cancelling download" aria-valuemin="0" aria-valuemax="100"${progressValue}>
+            <div class="${progressClass}"${progressStyle}></div>
+          </div>
+          <div class="progress-details">
+            <span>${esc(view.sizeText)}</span>
+            <span>Download stopping...</span>
+          </div>`;
       } else if (c.status === 'done') {
         actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
           <span class="card-status done">${esc(c.filename || '')}</span>`;
+      } else if (c.status === 'cancelled') {
+        actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Continue</button>
+          <button class="card-dl-btn" onclick="restartCard(${idx})">Restart</button>
+          <button class="card-dl-btn" onclick="deleteCard(${idx})">Delete</button>
+          <span class="card-status cancelled">Download cancelled</span>`;
       } else if (c.status === 'error') {
         const retryText = c.jobId ? 'Continue' : 'Retry';
         const restartButton = c.jobId ? ` <button class="card-dl-btn" onclick="restartCard(${idx})">Restart</button>` : '';
@@ -675,7 +702,7 @@
 
     async function dlCard(idx) {
       const c = cardData[idx];
-      const resuming = Boolean(c.jobId && c.status === 'error');
+      const resuming = Boolean(c.jobId && ['error', 'cancelled'].includes(c.status));
       c.status = 'downloading';
       c.error = null;
       c.phase = 'preparing';
@@ -714,6 +741,51 @@
       }
     }
 
+    async function cancelCard(idx) {
+      const c = cardData[idx];
+      if (!c.jobId || !Number.isInteger(Number(c.attemptNo)) || c.status !== 'downloading') return;
+      c.pollGeneration = (c.pollGeneration || 0) + 1;
+      c.generation = c.pollGeneration;
+      const generation = c.pollGeneration;
+      c.status = 'cancelling';
+      c.phase = 'cancelling';
+      c.error = null;
+      c.lastProgress = c.progress || c.lastProgress || null;
+      c.progress = null;
+      renderCard(idx);
+
+      try {
+        const res = await fetch(`/api/jobs/${c.jobId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ attempt_no: Number(c.attemptNo) }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          c.status = 'downloading';
+          c.phase = data.phase || 'downloading';
+          c.error = data.error || `Request failed (${res.status})`;
+          c.pollGeneration = (c.pollGeneration || 0) + 1;
+          c.generation = c.pollGeneration;
+          renderCard(idx);
+          pollCard(idx, c.pollGeneration);
+          return;
+        }
+        c.attemptNo = data.attempt_no;
+        c.phase = data.phase || data.state;
+        c.progress = data.progress || null;
+        c.lastProgress = data.last_progress || c.lastProgress || null;
+        c.status = data.state === 'cancelled' ? 'cancelled' : 'cancelling';
+        renderCard(idx);
+        if (c.status === 'cancelling') pollCard(idx, generation);
+      } catch (err) {
+        c.status = 'error';
+        c.phase = 'failed';
+        c.error = err.message || 'Cancel request failed';
+        renderCard(idx);
+      }
+    }
+
     function pollCard(idx, generation) {
       const c = cardData[idx];
       const poll = async () => {
@@ -724,11 +796,28 @@
           const res = await fetch(`/api/status/${c.jobId}`, { signal: controller.signal });
           const data = await res.json();
           if (cardData[idx] !== c || !ReclipJobs.shouldApplyResponse(c, data, generation)) return;
-          if (data.status === 'done') {
+          if (data.state === 'cancelled' || data.status === 'cancelled') {
+            c.status = 'cancelled';
+            c.attemptNo = data.attempt_no;
+            c.phase = 'cancelled';
+            c.progress = null;
+            c.lastProgress = data.last_progress || c.lastProgress || null;
+            c.error = null;
+            renderCard(idx);
+          } else if (data.state === 'cancelling') {
+            c.status = 'cancelling';
+            c.attemptNo = data.attempt_no;
+            c.phase = 'cancelling';
+            c.progress = null;
+            c.lastProgress = data.last_progress || c.lastProgress || null;
+            renderCard(idx);
+            setTimeout(poll, 1000);
+          } else if (data.status === 'done') {
             c.status = 'done';
             c.attemptNo = data.attempt_no;
             c.phase = data.phase;
             c.progress = data.progress;
+            c.lastProgress = data.last_progress || c.lastProgress || null;
             c.filename = data.filename;
             renderCard(idx);
             if (ReclipJobs.shouldAutoSave(
@@ -740,6 +829,7 @@
             c.attemptNo = data.attempt_no;
             c.phase = data.phase;
             c.progress = data.progress;
+            c.lastProgress = data.last_progress || c.lastProgress || null;
             c.error = data.error;
             renderCard(idx);
           } else {
@@ -815,7 +905,7 @@
           const idx = cardData.length;
           cardData.push(card);
           renderCard(idx);
-          if (card.status === 'downloading') pollCard(idx, 1);
+          if (['downloading', 'cancelling'].includes(card.status)) pollCard(idx, 1);
         }
       } catch {
         // The download page remains usable when the task list is temporarily unavailable.

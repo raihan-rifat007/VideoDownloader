@@ -1,8 +1,11 @@
 import json
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
+from download_process import ProcessCancelled
 from job_service import JobService
 from job_store import JobStore
 
@@ -72,6 +75,18 @@ class FakeRunner:
         )
         on_line("RECLIP_FINAL " + json.dumps(str(output)))
         return 0
+
+
+class BlockingRunner:
+    def __init__(self):
+        self.started = threading.Event()
+
+    def __call__(self, command, on_line, timeout_seconds, **kwargs):
+        cancel_event = kwargs["cancel_event"]
+        self.started.set()
+        while not cancel_event.is_set():
+            time.sleep(0.01)
+        raise ProcessCancelled()
 
 
 class JobServiceTests(unittest.TestCase):
@@ -162,6 +177,32 @@ class JobServiceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "changed"):
             self.service.resume(created["job_id"])
         self.assertEqual(self.store.get_job(created["job_id"])["state"], "failed")
+
+    def test_cancel_stops_current_attempt_and_marks_it_cancelled(self):
+        runner = BlockingRunner()
+        service = JobService(
+            self.store,
+            self.root,
+            runtime_epoch="epoch-A",
+            metadata_loader=lambda url: sample_info(),
+            runner=runner,
+            thread_factory=threading.Thread,
+        )
+
+        created = service.create(self.create_request())
+        self.assertTrue(runner.started.wait(timeout=1))
+
+        response = service.cancel(created["job_id"], 1)
+        self.assertIn(response["state"], {"cancelling", "cancelled"})
+
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            job = self.store.get_job(created["job_id"])
+            if job["state"] == "cancelled":
+                break
+            time.sleep(0.02)
+        self.assertEqual(self.store.get_job(created["job_id"])["state"], "cancelled")
+        self.assertEqual(self.store.get_job(created["job_id"])["attempt_no"], 1)
 
 
 if __name__ == "__main__":
