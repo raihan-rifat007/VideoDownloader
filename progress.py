@@ -6,6 +6,7 @@ import math
 
 DOWNLOAD_PREFIX = "RECLIP_PROGRESS "
 POSTPROCESS_PREFIX = "RECLIP_POSTPROCESS "
+FINAL_PREFIX = "RECLIP_FINAL "
 MAX_LINE_LENGTH = 16 * 1024
 
 
@@ -34,6 +35,15 @@ def parse_progress_line(line):
     elif line.startswith(POSTPROCESS_PREFIX):
         kind = "postprocess"
         payload = line[len(POSTPROCESS_PREFIX):]
+    elif line.startswith(FINAL_PREFIX):
+        payload = line[len(FINAL_PREFIX):]
+        try:
+            path = json.loads(payload)
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(path, str) or not path:
+            return None
+        return {"kind": "final", "path": path}
     else:
         return None
 

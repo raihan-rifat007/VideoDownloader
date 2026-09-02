@@ -2,6 +2,7 @@
 .gitignore
 downloads
 venv
+.venv
 tests
 __pycache__
 *.pyc

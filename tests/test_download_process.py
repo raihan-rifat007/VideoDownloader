@@ -5,13 +5,45 @@ import tempfile
 import time
 import unittest
 
-from download_process import run_streaming_process
+from download_process import DeadlineTracker, run_streaming_process
 
 
 FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "fake_downloader.py"
 
 
 class ProcessTests(unittest.TestCase):
+    def test_deadline_tracker_detects_download_idle_timeout(self):
+        now = [0.0]
+        tracker = DeadlineTracker(
+            prepare_timeout=10,
+            idle_timeout=5,
+            process_timeout=20,
+            hard_timeout=100,
+            clock=lambda: now[0],
+        )
+        self.assertIsNone(tracker.expired_reason())
+        tracker.observe({"kind": "download", "data": {"status": "downloading", "downloaded_bytes": 10}})
+        now[0] = 4.9
+        self.assertIsNone(tracker.expired_reason())
+        now[0] = 5.1
+        self.assertEqual(tracker.expired_reason(), "idle_timeout")
+
+    def test_deadline_tracker_enters_processing_after_stream_finishes(self):
+        now = [0.0]
+        tracker = DeadlineTracker(
+            prepare_timeout=10,
+            idle_timeout=5,
+            process_timeout=20,
+            hard_timeout=100,
+            clock=lambda: now[0],
+        )
+        tracker.observe({"kind": "download", "data": {"status": "downloading", "downloaded_bytes": 10}})
+        tracker.observe({"kind": "download", "data": {"status": "finished", "downloaded_bytes": 100}})
+        now[0] = 19.9
+        self.assertIsNone(tracker.expired_reason())
+        now[0] = 20.1
+        self.assertEqual(tracker.expired_reason(), "process_timeout")
+
     def test_streams_lines_before_process_exits(self):
         lines = []
         started = time.monotonic()

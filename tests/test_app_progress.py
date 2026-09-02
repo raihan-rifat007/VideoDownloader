@@ -1,4 +1,5 @@
 import unittest
+import uuid
 from pathlib import Path
 import tempfile
 from unittest.mock import patch
@@ -13,13 +14,16 @@ class ApiProgressTests(unittest.TestCase):
         self.client = app_module.app.test_client()
 
     def _create_job(self):
-        with patch.object(app_module.threading.Thread, "start"):
-            response = self.client.post(
-                "/api/download",
-                json={"url": "https://example.com/video.mp4", "format": "video"},
-            )
-        self.assertEqual(response.status_code, 200)
-        return response.get_json()["job_id"]
+        job_id = uuid.uuid4().hex[:10]
+        with app_module.jobs_lock:
+            app_module.jobs[job_id] = {
+                "status": "downloading",
+                "phase": "preparing",
+                "progress": app_module._empty_progress(),
+                "url": "https://example.com/video.mp4",
+                "title": "",
+            }
+        return job_id
 
     def test_initial_status_has_compatible_progress_fields(self):
         job_id = self._create_job()

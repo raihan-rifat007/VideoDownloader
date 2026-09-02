@@ -1,5 +1,4 @@
 import os
-import uuid
 import glob
 import json
 import subprocess
@@ -9,7 +8,10 @@ from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_file, render_template
 
 from download_process import run_streaming_process
+from job_service import JobService
+from job_store import JobStore
 from progress import normalize_download_progress, parse_progress_line
+from runtime_guard import RuntimeGuard
 
 app = Flask(__name__)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
@@ -18,6 +20,9 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 jobs = {}
 jobs_lock = threading.RLock()
 DOWNLOAD_TIMEOUT = 300
+_service_lock = threading.RLock()
+_job_service = None
+_runtime_guard = None
 
 DOWNLOAD_PROGRESS_TEMPLATE = (
     "download:RECLIP_PROGRESS "
@@ -27,6 +32,46 @@ POSTPROCESS_PROGRESS_TEMPLATE = (
     "postprocess:RECLIP_POSTPROCESS "
     "%(progress.{status,postprocessor})j"
 )
+
+
+def _get_job_service():
+    """Initialize the durable service once for the container process."""
+    global _job_service, _runtime_guard
+    if _job_service is not None:
+        return _job_service
+    with _service_lock:
+        if _job_service is not None:
+            return _job_service
+        root = os.environ.get("RECLIP_DOWNLOAD_DIR", DOWNLOAD_DIR)
+        root_path = os.path.abspath(root)
+        internal = os.path.join(root_path, ".reclip")
+        guard = RuntimeGuard(os.path.join(internal, "runtime.lock"))
+        epoch = guard.acquire()
+        try:
+            store = JobStore(os.path.join(internal, "jobs.sqlite3"))
+            store.initialize()
+            service = JobService(store, root_path, epoch)
+            service.recover()
+        except Exception:
+            guard.close()
+            raise
+        _runtime_guard = guard
+        _job_service = service
+        return service
+
+
+def _service_error(exc):
+    if isinstance(exc, KeyError):
+        return jsonify({"error": "Job not found"}), 404
+    if isinstance(exc, ValueError):
+        return jsonify({"error": str(exc)}), 400
+    if isinstance(exc, FileNotFoundError):
+        return jsonify({"error": "File is no longer available"}), 410
+    if isinstance(exc, RuntimeError):
+        message = str(exc)
+        status = 503 if "restart" in message.lower() or "storage" in message.lower() else 409
+        return jsonify({"error": message}), status
+    return jsonify({"error": "Request could not be completed"}), 500
 
 
 def _empty_progress():
@@ -298,58 +343,88 @@ def get_playlist_info():
 
 @app.route("/api/download", methods=["POST"])
 def start_download():
-    data = request.json
-    url = data.get("url", "").strip()
-    format_choice = data.get("format", "video")
-    format_id = data.get("format_id")
-    title = data.get("title", "")
-
-    if not url:
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid request body"}), 400
+    url = data.get("url", "")
+    if not isinstance(url, str) or not url.strip():
         return jsonify({"error": "No URL provided"}), 400
-    if not is_safe_url(url):
+    if not is_safe_url(url.strip()):
         return jsonify({"error": "Invalid URL"}), 400
-
-    job_id = uuid.uuid4().hex[:10]
-    with jobs_lock:
-        jobs[job_id] = {
-            "status": "downloading",
-            "phase": "preparing",
-            "progress": _empty_progress(),
-            "url": url,
-            "title": title,
-        }
-
-    thread = threading.Thread(target=run_download, args=(job_id, url, format_choice, format_id))
-    thread.daemon = True
-    thread.start()
-
-    return jsonify({"job_id": job_id})
+    try:
+        return jsonify(_get_job_service().create(data))
+    except Exception as exc:
+        return _service_error(exc)
 
 
 @app.route("/api/status/<job_id>")
 def check_status(job_id):
     with jobs_lock:
         job = jobs.get(job_id)
-        if not job:
-            return jsonify({"error": "Job not found"}), 404
-        return jsonify({
-            "status": job["status"],
-            "error": job.get("error"),
-            "filename": job.get("filename"),
-            "phase": job.get("phase"),
-            "progress": job.get("progress"),
-        })
+        if job:
+            return jsonify({
+                "status": job["status"],
+                "error": job.get("error"),
+                "filename": job.get("filename"),
+                "phase": job.get("phase"),
+                "progress": job.get("progress"),
+            })
+    try:
+        return jsonify(_get_job_service().status(job_id))
+    except Exception as exc:
+        return _service_error(exc)
 
 
 @app.route("/api/file/<job_id>")
 def download_file(job_id):
     with jobs_lock:
         job = jobs.get(job_id)
-        if not job or job["status"] != "done":
-            return jsonify({"error": "File not ready"}), 404
-        file_path = job["file"]
-        filename = job["filename"]
-    return send_file(file_path, as_attachment=True, download_name=filename)
+        if job:
+            if job["status"] != "done":
+                return jsonify({"error": "File not ready"}), 404
+            file_path = job["file"]
+            filename = job["filename"]
+            return send_file(file_path, as_attachment=True, download_name=filename)
+    try:
+        file_path, filename = _get_job_service().file_path(job_id)
+        return send_file(file_path, as_attachment=True, download_name=filename)
+    except Exception as exc:
+        return _service_error(exc)
+
+
+@app.route("/api/jobs")
+def list_jobs():
+    try:
+        limit = request.args.get("limit", default=50, type=int)
+        cursor = request.args.get("cursor")
+        return jsonify(_get_job_service().list_jobs(limit, cursor))
+    except Exception as exc:
+        return _service_error(exc)
+
+
+@app.route("/api/jobs/<job_id>/resume", methods=["POST"])
+def resume_job(job_id):
+    try:
+        return jsonify(_get_job_service().resume(job_id)), 202
+    except Exception as exc:
+        return _service_error(exc)
+
+
+@app.route("/api/jobs/<job_id>/restart", methods=["POST"])
+def restart_job(job_id):
+    try:
+        return jsonify(_get_job_service().restart(job_id)), 201
+    except Exception as exc:
+        return _service_error(exc)
+
+
+@app.route("/api/jobs/<job_id>", methods=["DELETE"])
+def delete_job(job_id):
+    try:
+        _get_job_service().delete(job_id)
+        return ("", 204)
+    except Exception as exc:
+        return _service_error(exc)
 
 
 if __name__ == "__main__":

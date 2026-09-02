@@ -65,6 +65,10 @@ class ProgressTests(unittest.TestCase):
         self.assertIsNone(parse_progress_line("ordinary diagnostic line"))
         self.assertIsNone(parse_progress_line("RECLIP_PROGRESS not-json"))
 
+    def test_final_file_event_is_parsed_separately(self):
+        event = parse_progress_line('RECLIP_FINAL "media.mp4"')
+        self.assertEqual(event, {"kind": "final", "path": "media.mp4"})
+
 
 if __name__ == "__main__":
     unittest.main()
