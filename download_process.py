@@ -8,18 +8,26 @@ import threading
 import time
 
 
+def _windows_taskkill(pid, timeout):
+    try:
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return False
+    return True
+
+
 def _terminate_process_tree(process):
     if process.poll() is not None:
         return
 
     if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-            timeout=1,
-        )
+        _windows_taskkill(process.pid, timeout=1)
     else:
         try:
             os.killpg(os.getpgid(process.pid), signal.SIGTERM)
@@ -30,13 +38,7 @@ def _terminate_process_tree(process):
         process.wait(timeout=0.5)
     except subprocess.TimeoutExpired:
         if os.name == "nt":
-            subprocess.run(
-                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=False,
-                timeout=0.5,
-            )
+            _windows_taskkill(process.pid, timeout=0.5)
         else:
             try:
                 os.killpg(os.getpgid(process.pid), signal.SIGKILL)
