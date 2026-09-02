@@ -17,6 +17,7 @@ from download_plan import (
     validate_final_file,
     validate_resume_plan,
 )
+from download_filename import job_download_filename
 from download_process import DeadlineTracker, run_streaming_process
 from job_store import JobStore
 from progress import normalize_download_progress, parse_progress_line
@@ -203,7 +204,7 @@ class JobService:
             "attempt_no": job["attempt_no"],
             "error": job["error_message"],
             "error_code": job["error_code"],
-            "filename": job["filename"],
+            "filename": job_download_filename(job),
             "phase": phase,
             "progress": job["progress_json"],
             "last_progress": job["last_progress_json"],
@@ -220,14 +221,17 @@ class JobService:
 
     def file_path(self, job_id: str) -> tuple[Path, str]:
         job = self._require_job(job_id)
-        if job["state"] != "completed" or not job["final_relpath"] or not job["filename"]:
+        if job["state"] != "completed" or not job["final_relpath"]:
             raise RuntimeError("File is not ready")
         root = self.download_root.resolve()
         candidate = (root / Path(job["final_relpath"])).resolve(strict=False)
         task_dir = self._task_dir(job_id).resolve()
         if not candidate.is_relative_to(task_dir) or candidate.is_symlink() or not candidate.is_file():
             raise FileNotFoundError("File is no longer available")
-        return candidate, job["filename"]
+        filename = job_download_filename(job)
+        if filename is None:
+            raise RuntimeError("Download filename is unavailable")
+        return candidate, filename
 
     def delete(self, job_id: str) -> None:
         job = self._require_job(job_id)
@@ -407,7 +411,7 @@ class JobService:
             "attempt_no": job["attempt_no"],
             "created_at": job["created_at"],
             "updated_at": job["updated_at"],
-            "filename": job["filename"],
+            "filename": job_download_filename(job),
             "error": job["error_message"],
             "progress": job["progress_json"],
             "last_progress": job["last_progress_json"],

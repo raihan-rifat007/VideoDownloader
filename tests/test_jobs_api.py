@@ -69,6 +69,89 @@ class JobsApiTests(unittest.TestCase):
             [call[0] for call in self.service.calls], ["resume", "restart", "delete"]
         )
 
+    def test_unicode_attachment_filename_and_original_bytes(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from urllib.parse import quote
+
+        with TemporaryDirectory() as directory:
+            media = Path(directory) / "media.mp4"
+            media.write_bytes(b"test-content")
+            with patch.object(app_module, "_get_job_service", return_value=self.service):
+                with patch.object(
+                    self.service,
+                    "file_path",
+                    return_value=(media, "熊猫的一天.mp4"),
+                ):
+                    response = self.client.get("/api/file/" + "a" * 32)
+            try:
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data, b"test-content")
+                disposition = response.headers["Content-Disposition"]
+                self.assertIn("attachment", disposition)
+                self.assertIn(quote("熊猫的一天.mp4"), disposition)
+                self.assertNotIn("\r", disposition)
+                self.assertNotIn("\n", disposition)
+            finally:
+                response.close()
+
+    def test_real_service_uses_one_name_across_endpoints(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from urllib.parse import unquote
+
+        from job_service import JobService
+        from job_store import JobStore
+        from tests.test_job_service import FakeRunner, ImmediateThread, sample_info
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            store = JobStore(root / "jobs.sqlite3")
+            store.initialize()
+            runner = FakeRunner()
+            runner.mode = "success"
+            service = JobService(
+                store,
+                root / "downloads",
+                runtime_epoch="filename-test",
+                metadata_loader=lambda url: sample_info(),
+                runner=runner,
+                thread_factory=ImmediateThread,
+            )
+            response = None
+            try:
+                job_id = service.create(
+                    {
+                        "url": "https://example.com/sample",
+                        "format": "video",
+                        "title": "熊猫的一天",
+                        "format_id": None,
+                    }
+                )["job_id"]
+                before = store.get_job(job_id)
+                with patch.object(
+                    app_module, "_get_job_service", return_value=service
+                ):
+                    status = self.client.get(f"/api/status/{job_id}").get_json()
+                    listing = self.client.get("/api/jobs").get_json()
+                    response = self.client.get(f"/api/file/{job_id}")
+
+                name = "熊猫的一天.mp4"
+                self.assertEqual(status["filename"], name)
+                item = next(j for j in listing["items"] if j["job_id"] == job_id)
+                self.assertEqual(item["filename"], name)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(name, unquote(response.headers["Content-Disposition"]))
+                self.assertEqual(response.data, b"completed media")
+                self.assertEqual(store.get_job(job_id), before)
+                self.assertTrue(
+                    (root / "downloads" / "jobs" / job_id / "media.mp4").is_file()
+                )
+            finally:
+                if response is not None:
+                    response.close()
+                store.close()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -48,6 +48,14 @@ available only on the local computer by default.
 4. Select quality/resolution if available
 5. Click **Download** on individual videos, or **Download All**
 
+Completed files are presented using the media title, for example
+`熊猫的一天.mp4` or `熊猫的一天.mp3`. ReClip keeps its internal task files
+under the task directory for resumable downloads; the title is used for the
+browser-facing download name. Titles are sanitized for the current platform,
+and a task ID suffix is used when no usable title is available. If the same
+name already exists on your computer, the final duplicate-name behavior is
+controlled by your browser.
+
 ### Interrupted downloads
 
 Downloads are stored under the Docker volume mounted at `/app/downloads`.

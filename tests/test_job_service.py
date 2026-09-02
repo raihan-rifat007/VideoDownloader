@@ -123,8 +123,25 @@ class JobServiceTests(unittest.TestCase):
         )
         file_path, filename = self.service.file_path(created["job_id"])
         self.assertEqual(file_path, task_dir / "media.mp4")
-        self.assertEqual(filename, "media.mp4")
+        self.assertEqual(filename, "Sample title.mp4")
         self.assertIsNotNone(self.runner.kwargs[1]["deadline_tracker"])
+
+    def test_completed_task_has_one_public_filename(self):
+        self.runner.mode = "success"
+        created = self.service.create(self.create_request())
+        job_id = created["job_id"]
+        before = self.store.get_job(job_id)
+        path, filename = self.service.file_path(job_id)
+
+        self.assertEqual(path.name, "media.mp4")
+        self.assertEqual(filename, "Sample title.mp4")
+        self.assertEqual(self.service.status(job_id)["filename"], filename)
+        listed = self.service.list_jobs()["items"]
+        self.assertEqual(
+            next(j for j in listed if j["job_id"] == job_id)["filename"], filename
+        )
+        self.assertEqual(self.store.get_job(job_id), before)
+        self.assertEqual(path.read_bytes(), b"completed media")
 
     def test_restart_creates_new_task_and_keeps_failed_task(self):
         created = self.service.create(self.create_request())

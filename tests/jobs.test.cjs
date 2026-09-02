@@ -40,3 +40,13 @@ test('job card maps interrupted state to retryable error', () => {
   assert.equal(card.jobId, 'a');
   assert.equal(card.canRetry, true);
 });
+
+test('restored completed card keeps the server filename', () => {
+  const job = {
+    job_id: 'a'.repeat(32), title: '熊猫的一天', format: 'video',
+    state: 'completed', attempt_no: 1, filename: '熊猫的一天.mp4',
+  };
+  const card = jobs.jobToCard(job);
+  assert.equal(card.filename, '熊猫的一天.mp4');
+  assert.equal(jobs.shouldAutoSave(job, new Set()), false);
+});
