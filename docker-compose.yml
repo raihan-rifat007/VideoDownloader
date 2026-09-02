@@ -4,7 +4,7 @@ services:
     image: reclip:latest
     container_name: reclip
     ports:
-      - "8899:8899"
+       - "127.0.0.1:8899:8899"
     volumes:
       - reclip-downloads:/app/downloads
     restart: unless-stopped
