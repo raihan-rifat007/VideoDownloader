@@ -118,7 +118,10 @@ def _stop_process_and_reader(process, reader, process_group_id):
 
     if process.poll() is None or reader.is_alive():
         kill_ok = _signal_process_tree(
-            process, process_group_id, signal.SIGKILL, timeout=1
+            process,
+            process_group_id,
+            getattr(signal, "SIGKILL", signal.SIGTERM),
+            timeout=1,
         )
         try:
             process.wait(timeout=2)
