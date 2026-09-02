@@ -45,6 +45,12 @@ class DownloadFilenameTests(unittest.TestCase):
             build_download_filename("示例", JOB_ID, ".m2ts"), "示例.m2ts"
         )
 
+    def test_non_media_extension_is_rejected(self):
+        for extension in (".exe", ".html", ".bat"):
+            with self.subTest(extension=extension):
+                with self.assertRaises(ValueError):
+                    build_download_filename("示例", JOB_ID, extension)
+
 
 if __name__ == "__main__":
     unittest.main()

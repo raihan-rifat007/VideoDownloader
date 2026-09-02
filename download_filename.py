@@ -8,7 +8,47 @@ from pathlib import PurePosixPath
 from typing import Any
 
 
-MEDIA_EXTENSION_PATTERN = re.compile(r"\.[a-z0-9]{1,10}\Z", re.IGNORECASE)
+MEDIA_EXTENSIONS = {
+    ".3g2",
+    ".3gp",
+    ".aac",
+    ".ac3",
+    ".aiff",
+    ".alac",
+    ".ape",
+    ".asf",
+    ".avi",
+    ".caf",
+    ".dts",
+    ".flac",
+    ".flv",
+    ".gif",
+    ".m2ts",
+    ".m2v",
+    ".m4a",
+    ".m4v",
+    ".mka",
+    ".mkv",
+    ".mod",
+    ".mov",
+    ".mp2",
+    ".mp3",
+    ".mp4",
+    ".mpeg",
+    ".mpg",
+    ".mts",
+    ".ogg",
+    ".ogv",
+    ".opus",
+    ".rm",
+    ".rmvb",
+    ".ts",
+    ".vob",
+    ".wav",
+    ".webm",
+    ".wma",
+    ".wmv",
+}
 FORBIDDEN = set('\\/:*?"<>|')
 RESERVED = {"CON", "PRN", "AUX", "NUL"} | {
     prefix + suffix
@@ -21,7 +61,7 @@ def build_download_filename(title: object, job_id: str, extension: str) -> str:
     """Return a safe, deterministic browser-facing media filename."""
     if not isinstance(job_id, str) or re.fullmatch(r"[0-9a-f]{32}", job_id) is None:
         raise ValueError("Invalid job ID")
-    if not isinstance(extension, str) or MEDIA_EXTENSION_PATTERN.fullmatch(extension) is None:
+    if not isinstance(extension, str) or extension.lower() not in MEDIA_EXTENSIONS:
         raise ValueError("Invalid media extension")
 
     ext = extension.lower()
