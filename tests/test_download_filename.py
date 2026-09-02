@@ -40,9 +40,10 @@ class DownloadFilenameTests(unittest.TestCase):
         self.assertEqual(job_download_filename(job), "旧视频.mp4")
         self.assertEqual(job, before)
 
-    def test_unknown_extension_is_not_disguised(self):
-        with self.assertRaises(ValueError):
-            build_download_filename("示例", JOB_ID, ".exe")
+    def test_unlisted_media_extension_is_preserved(self):
+        self.assertEqual(
+            build_download_filename("示例", JOB_ID, ".m2ts"), "示例.m2ts"
+        )
 
 
 if __name__ == "__main__":
