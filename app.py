@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_file, render_template
 
 from download_process import run_streaming_process
-from job_service import JobService
+from job_service import CancelUnavailableError, JobService
 from job_store import JobStore
 from progress import normalize_download_progress, parse_progress_line
 from runtime_guard import RuntimeGuard
@@ -69,7 +69,13 @@ def _service_error(exc):
         return jsonify({"error": "File is no longer available"}), 410
     if isinstance(exc, RuntimeError):
         message = str(exc)
-        status = 503 if "restart" in message.lower() or "storage" in message.lower() else 409
+        status = (
+            503
+            if isinstance(exc, CancelUnavailableError)
+            or "restart" in message.lower()
+            or "storage" in message.lower()
+            else 409
+        )
         return jsonify({"error": message}), status
     return jsonify({"error": "Request could not be completed"}), 500
 
@@ -406,6 +412,23 @@ def list_jobs():
 def resume_job(job_id):
     try:
         return jsonify(_get_job_service().resume(job_id)), 202
+    except Exception as exc:
+        return _service_error(exc)
+
+
+@app.route("/api/jobs/<job_id>/cancel", methods=["POST"])
+def cancel_job(job_id):
+    data = request.get_json(silent=True)
+    if (
+        not isinstance(data, dict)
+        or not isinstance(data.get("attempt_no"), int)
+        or isinstance(data.get("attempt_no"), bool)
+        or data["attempt_no"] <= 0
+    ):
+        return jsonify({"error": "Invalid attempt number"}), 400
+    try:
+        result = _get_job_service().cancel(job_id, data["attempt_no"])
+        return jsonify(result), 200 if result.get("state") == "cancelled" else 202
     except Exception as exc:
         return _service_error(exc)
 

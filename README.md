@@ -19,6 +19,7 @@ https://github.com/user-attachments/assets/419d3e50-c933-444b-8cab-a9724986ba05
 - Clean, responsive UI — no frameworks, no build step
 - Live download progress, speed, size and ETA
 - Resumable task records for interrupted downloads
+- Cancel active downloads while preserving their partial files for later continuation
 
 ## Quick Start
 
@@ -61,6 +62,18 @@ does not support byte ranges or no longer exposes the selected format, ReClip
 will refuse to append to the old task; use **Restart** to create a new task.
 The application does not automatically start interrupted downloads after a
 container restart. Completed files can be saved again from the task list.
+
+### Cancelling downloads
+
+Click **Cancel** on an active task to stop its current downloader process. The
+task first shows **Cancelling** while ReClip confirms that the process and its
+children have stopped; only then is it marked **Cancelled**. Partial files and
+the last known progress are preserved, and no completed file is published.
+
+For a cancelled task, **Continue** creates the next attempt in the same task
+and asks yt-dlp to reuse compatible partial files. **Restart** creates a new
+task from the original URL. **Delete** removes the task record and its task
+directory after confirmation.
 
 Task history now retains the source URL, title and partial files until the task
 is explicitly deleted. Do not expose this local service to the public network;

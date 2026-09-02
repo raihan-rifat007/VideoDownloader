@@ -49,21 +49,34 @@
 
   function jobToCard(job) {
     const active = ['preparing', 'downloading', 'processing'].includes(job.state);
+    const cancelling = job.state === 'cancelling';
+    const cancelled = job.state === 'cancelled';
     return {
       jobId: job.job_id,
       attemptNo: job.attempt_no,
       url: '',
       title: job.title || '',
       format: job.format || 'video',
-      status: job.state === 'completed' ? 'done' : active ? 'downloading' : 'error',
-      phase: active ? job.state : job.state === 'interrupted' ? 'interrupted' : 'failed',
+      status: job.state === 'completed'
+        ? 'done'
+        : active
+          ? 'downloading'
+          : cancelling
+            ? 'cancelling'
+            : cancelled
+              ? 'cancelled'
+              : 'error',
+      phase: active || cancelling || cancelled
+        ? job.state
+        : job.state === 'interrupted' ? 'interrupted' : 'failed',
       progress: job.progress || null,
       lastProgress: job.last_progress || null,
       filename: job.filename || '',
       error: job.error || '',
       canRetry: job.can_retry === undefined
-        ? ['failed', 'interrupted'].includes(job.state)
+        ? ['failed', 'interrupted', 'cancelled'].includes(job.state)
         : Boolean(job.can_retry),
+      canCancel: job.can_cancel === undefined ? active : Boolean(job.can_cancel),
       restored: true,
     };
   }

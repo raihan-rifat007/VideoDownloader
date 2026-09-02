@@ -14,6 +14,8 @@
     downloading: 'Downloading current stream',
     finalizing: 'Finishing current stream',
     processing: 'Processing media',
+    cancelling: 'Cancelling download',
+    cancelled: 'Download cancelled',
     complete: 'Ready to save',
     failed: 'Download failed',
   };

@@ -8,6 +8,18 @@ import threading
 import time
 
 
+class ProcessCancelled(Exception):
+    """Raised only after a requested process-tree stop is confirmed."""
+
+    def __init__(self, exit_code=None):
+        super().__init__("Download process cancelled")
+        self.exit_code = exit_code
+
+
+class ProcessStopError(RuntimeError):
+    """Raised when the process tree or output reader cannot be confirmed stopped."""
+
+
 class DeadlineTracker:
     """Track preparation, useful download progress, post-processing and hard limits."""
 
@@ -70,7 +82,7 @@ class DeadlineTracker:
 
 def _windows_taskkill(pid, timeout):
     try:
-        subprocess.run(
+        result = subprocess.run(
             ["taskkill", "/PID", str(pid), "/T", "/F"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -79,39 +91,59 @@ def _windows_taskkill(pid, timeout):
         )
     except subprocess.TimeoutExpired:
         return False
+    return result.returncode == 0
+
+
+def _signal_process_tree(process, process_group_id, sig, timeout):
+    if os.name == "nt":
+        return _windows_taskkill(process.pid, timeout=timeout)
+    try:
+        os.killpg(process_group_id, sig)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
     return True
 
 
-def _terminate_process_tree(process):
-    if process.poll() is not None:
-        return
-
-    if os.name == "nt":
-        _windows_taskkill(process.pid, timeout=1)
-    else:
-        try:
-            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
-            process.terminate()
-
+def _stop_process_and_reader(process, reader, process_group_id):
+    term_ok = _signal_process_tree(
+        process, process_group_id, signal.SIGTERM, timeout=1
+    )
     try:
-        process.wait(timeout=0.5)
+        process.wait(timeout=2)
     except subprocess.TimeoutExpired:
-        if os.name == "nt":
-            _windows_taskkill(process.pid, timeout=0.5)
-        else:
-            try:
-                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                process.kill()
+        pass
+    reader.join(timeout=2)
+
+    if process.poll() is None or reader.is_alive():
+        kill_ok = _signal_process_tree(
+            process, process_group_id, signal.SIGKILL, timeout=1
+        )
         try:
-            process.wait(timeout=1)
+            process.wait(timeout=2)
         except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=1)
+            pass
+        reader.join(timeout=2)
+    else:
+        kill_ok = True
+
+    # The target may have exited naturally between the poll and taskkill.
+    # taskkill then returns a non-zero status even though there is nothing
+    # left to stop.  The observable safety condition is that both the process
+    # and the pipe reader have actually terminated.
+    stopped = process.poll() is not None and not reader.is_alive()
+    return stopped
 
 
-def run_streaming_process(cmd, on_line, timeout_seconds=300, *, deadline_tracker=None):
+def run_streaming_process(
+    cmd,
+    on_line,
+    timeout_seconds=300,
+    *,
+    deadline_tracker=None,
+    cancel_event=None,
+):
     """Run *cmd*, forwarding output lines to *on_line* before exit.
 
     The process is started without a shell. The main thread owns the timeout
@@ -130,7 +162,17 @@ def run_streaming_process(cmd, on_line, timeout_seconds=300, *, deadline_tracker
     if os.name != "nt":
         popen_kwargs["start_new_session"] = True
 
+    if cancel_event is not None and cancel_event.is_set():
+        raise ProcessCancelled()
+
     process = subprocess.Popen(cmd, **popen_kwargs)
+    if os.name == "nt":
+        process_group_id = None
+    else:
+        try:
+            process_group_id = os.getpgid(process.pid)
+        except ProcessLookupError:
+            process_group_id = process.pid
     callback_errors = queue.Queue(maxsize=1)
 
     def consume_output():
@@ -151,6 +193,10 @@ def run_streaming_process(cmd, on_line, timeout_seconds=300, *, deadline_tracker
     reader.daemon = True
     reader.start()
 
+    def stop_or_raise():
+        if not _stop_process_and_reader(process, reader, process_group_id):
+            raise ProcessStopError("Unable to confirm download process stopped")
+
     deadline = time.monotonic() + timeout_seconds
     try:
         while process.poll() is None:
@@ -159,28 +205,31 @@ def run_streaming_process(cmd, on_line, timeout_seconds=300, *, deadline_tracker
             except queue.Empty:
                 callback_error = None
             else:
-                _terminate_process_tree(process)
+                stop_or_raise()
                 raise callback_error
+
+            if cancel_event is not None and cancel_event.is_set():
+                stop_or_raise()
+                raise ProcessCancelled(process.returncode)
 
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                _terminate_process_tree(process)
+                stop_or_raise()
                 timeout = subprocess.TimeoutExpired(cmd, timeout_seconds)
                 timeout.reason = "attempt_timeout"
                 raise timeout
             if deadline_tracker is not None:
                 reason = deadline_tracker.expired_reason()
                 if reason is not None:
-                    _terminate_process_tree(process)
+                    stop_or_raise()
                     timeout = subprocess.TimeoutExpired(cmd, time.monotonic() - deadline + timeout_seconds)
                     timeout.reason = reason
                     raise timeout
             time.sleep(min(0.05, remaining))
 
-        reader.join(timeout=1)
+        reader.join(timeout=2)
         if reader.is_alive():
-            _terminate_process_tree(process)
-            reader.join(timeout=1)
+            stop_or_raise()
         try:
             callback_error = callback_errors.get_nowait()
         except queue.Empty:
@@ -189,7 +238,6 @@ def run_streaming_process(cmd, on_line, timeout_seconds=300, *, deadline_tracker
             raise callback_error
         return process.returncode
     except BaseException:
-        if process.poll() is None:
-            _terminate_process_tree(process)
-        reader.join(timeout=1)
+        if process.poll() is None or reader.is_alive():
+            stop_or_raise()
         raise
