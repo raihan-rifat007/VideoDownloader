@@ -270,6 +270,38 @@
     .card-status.done { color: var(--success); }
     .card-status.error { color: var(--error); }
 
+    .progress-bar-wrap {
+      width: 100%;
+      height: 4px;
+      margin-top: 8px;
+      overflow: hidden;
+      border-radius: 2px;
+      background: var(--card-border);
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: var(--accent);
+      transition: width 0.3s ease;
+    }
+    .progress-details {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 10px;
+      margin-top: 5px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+    }
+    .progress-bar-fill.indeterminate {
+      width: 35%;
+      animation: progress-slide 1.2s ease-in-out infinite;
+    }
+    @keyframes progress-slide {
+      from { transform: translateX(-100%); }
+      to { transform: translateX(285%); }
+    }
+
     .q-chip {
       padding: 4px 10px;
       border: 1.5px solid var(--card-border);
@@ -407,9 +439,12 @@
     </div>
   </div>
 
+  <script src="{{ url_for('static', filename='progress.js') }}"></script>
+  <script src="{{ url_for('static', filename='jobs.js') }}"></script>
   <script>
     let currentFormat = 'video';
     let cardData = [];
+    const pageStartedJobs = new Set();
 
     function setFormat(btn) {
       document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
@@ -562,7 +597,7 @@
 
       // Ready / downloading / done / error states
       el.className = 'card';
-      const isAudio = currentFormat === 'audio';
+      const isAudio = (c.format || currentFormat) === 'audio';
 
       let thumbHtml;
       if (isAudio) {
@@ -584,12 +619,31 @@
       if (c.status === 'ready') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Download</button>${qualityChips}`;
       } else if (c.status === 'downloading') {
-        actionHtml = `<span class="card-status downloading"><span class="spin"></span> Downloading...</span>`;
+        const view = ReclipProgress.progressViewModel(c, Date.now());
+        const percentText = view.percent == null ? '' : ` · ${Math.round(view.percent)}%`;
+        const progressClass = view.indeterminate ? 'progress-bar-fill indeterminate' : 'progress-bar-fill';
+        const progressStyle = view.indeterminate ? '' : ` style="width:${view.percent}%"`;
+        const progressValue = view.indeterminate ? '' : ` aria-valuenow="${view.percent}"`;
+        actionHtml = `
+          <span class="card-status downloading" aria-live="polite">
+            <span class="spin"></span> ${esc(view.phaseText)}${percentText}
+          </span>
+          <div class="progress-bar-wrap" role="progressbar" aria-label="${esc(view.phaseText)}" aria-valuemin="0" aria-valuemax="100"${progressValue}>
+            <div class="${progressClass}"${progressStyle}></div>
+          </div>
+          <div class="progress-details">
+            <span>${esc(view.sizeText)}</span>
+            <span>${esc(view.speedText)}</span>
+            <span>ETA ${esc(view.etaText)}</span>
+          </div>`;
       } else if (c.status === 'done') {
         actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
           <span class="card-status done">${esc(c.filename || '')}</span>`;
       } else if (c.status === 'error') {
-        actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Retry</button>
+        const retryText = c.jobId ? 'Continue' : 'Retry';
+        const restartButton = c.jobId ? ` <button class="card-dl-btn" onclick="restartCard(${idx})">Restart</button>` : '';
+        const deleteButton = c.jobId ? ` <button class="card-dl-btn" onclick="deleteCard(${idx})">Delete</button>` : '';
+        actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">${retryText}</button>${restartButton}${deleteButton}
           <span class="card-status error">${esc(friendlyError(c.error || 'Download failed'))}</span>`;
       }
 
@@ -621,30 +675,38 @@
 
     async function dlCard(idx) {
       const c = cardData[idx];
+      const resuming = Boolean(c.jobId && c.status === 'error');
       c.status = 'downloading';
       c.error = null;
+      c.phase = 'preparing';
+      c.progress = null;
+      c.pollGeneration = (c.pollGeneration || 0) + 1;
+      c.generation = c.pollGeneration;
+      const generation = c.pollGeneration;
       renderCard(idx);
 
       try {
-        const res = await fetch('/api/download', {
+        const res = await fetch(resuming ? `/api/jobs/${c.jobId}/resume` : '/api/download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: c.url,
-            format: currentFormat,
-            format_id: c.selectedFormatId,
-            title: c.title || '',
-          }),
+          body: resuming ? undefined : JSON.stringify({
+              url: c.url,
+              format: currentFormat,
+              format_id: currentFormat === 'audio' ? null : c.selectedFormatId,
+              title: c.title || '',
+            }),
         });
         const data = await res.json();
-        if (data.error) {
+        if (!res.ok || data.error) {
           c.status = 'error';
-          c.error = data.error;
+          c.error = data.error || `Request failed (${res.status})`;
           renderCard(idx);
           return;
         }
         c.jobId = data.job_id;
-        pollCard(idx);
+        c.attemptNo = data.attempt_no;
+        pageStartedJobs.add(c.jobId);
+        pollCard(idx, generation);
       } catch (err) {
         c.status = 'error';
         c.error = err.message;
@@ -652,31 +714,112 @@
       }
     }
 
-    function pollCard(idx) {
+    function pollCard(idx, generation) {
       const c = cardData[idx];
-      const iv = setInterval(async () => {
+      const poll = async () => {
+        if (cardData[idx] !== c || c.pollGeneration !== generation) return;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
         try {
-          const res = await fetch(`/api/status/${c.jobId}`);
+          const res = await fetch(`/api/status/${c.jobId}`, { signal: controller.signal });
           const data = await res.json();
+          if (cardData[idx] !== c || !ReclipJobs.shouldApplyResponse(c, data, generation)) return;
           if (data.status === 'done') {
-            clearInterval(iv);
             c.status = 'done';
+            c.attemptNo = data.attempt_no;
+            c.phase = data.phase;
+            c.progress = data.progress;
             c.filename = data.filename;
             renderCard(idx);
-            saveCard(idx);
+            if (ReclipJobs.shouldAutoSave(
+              { job_id: c.jobId, state: data.state === 'completed' ? 'completed' : data.status },
+              pageStartedJobs,
+            )) saveCard(idx);
           } else if (data.status === 'error') {
-            clearInterval(iv);
             c.status = 'error';
+            c.attemptNo = data.attempt_no;
+            c.phase = data.phase;
+            c.progress = data.progress;
             c.error = data.error;
             renderCard(idx);
+          } else {
+            c.phase = data.phase || 'downloading';
+            c.progress = data.progress;
+            renderCard(idx);
+            setTimeout(poll, 1000);
           }
         } catch {
-          clearInterval(iv);
-          c.status = 'error';
-          c.error = 'Lost connection to server';
-          renderCard(idx);
+          if (cardData[idx] === c && c.pollGeneration === generation) {
+            c.status = 'error';
+            c.error = 'Lost connection to server';
+            renderCard(idx);
+          }
+        } finally {
+          clearTimeout(timeout);
         }
-      }, 1000);
+      };
+      poll();
+    }
+
+    async function restartCard(idx) {
+      const c = cardData[idx];
+      try {
+        const res = await fetch(`/api/jobs/${c.jobId}/restart`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || `Request failed (${res.status})`);
+        c.jobId = data.job_id;
+        c.attemptNo = data.attempt_no;
+        c.status = 'downloading';
+        c.phase = 'preparing';
+        c.progress = null;
+        c.error = null;
+        c.restored = false;
+        c.pollGeneration = (c.pollGeneration || 0) + 1;
+        c.generation = c.pollGeneration;
+        pageStartedJobs.add(c.jobId);
+        renderCard(idx);
+        pollCard(idx, c.pollGeneration);
+      } catch (err) {
+        c.status = 'error';
+        c.error = err.message;
+        renderCard(idx);
+      }
+    }
+
+    async function deleteCard(idx) {
+      const c = cardData[idx];
+      if (!c.jobId || !window.confirm('Delete this task and its downloaded files?')) return;
+      try {
+        const res = await fetch(`/api/jobs/${c.jobId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || `Request failed (${res.status})`);
+        }
+        cardData.splice(idx, 1);
+        document.getElementById(`card-${idx}`)?.remove();
+      } catch (err) {
+        c.error = err.message;
+        renderCard(idx);
+      }
+    }
+
+    async function loadJobs() {
+      try {
+        const res = await fetch('/api/jobs?limit=50');
+        if (!res.ok) return;
+        const data = await res.json();
+        const restored = ReclipJobs.mergeJobs([], data.items || []).map(ReclipJobs.jobToCard);
+        for (const card of restored) {
+          card.pollGeneration = 1;
+          card.generation = 1;
+          const idx = cardData.length;
+          cardData.push(card);
+          renderCard(idx);
+          if (card.status === 'downloading') pollCard(idx, 1);
+        }
+      } catch {
+        // The download page remains usable when the task list is temporarily unavailable.
+      }
     }
 
     function saveCard(idx) {
@@ -700,6 +843,8 @@
 
       if (btn) { btn.disabled = false; btn.textContent = 'Download All'; }
     }
+
+    loadJobs();
   </script>
 </body>
 </html>

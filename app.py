@@ -1,17 +1,120 @@
 import os
-import uuid
 import glob
 import json
 import subprocess
 import threading
+import time
 from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_file, render_template
+
+from download_process import run_streaming_process
+from job_service import JobService
+from job_store import JobStore
+from progress import normalize_download_progress, parse_progress_line
+from runtime_guard import RuntimeGuard
 
 app = Flask(__name__)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 jobs = {}
+jobs_lock = threading.RLock()
+DOWNLOAD_TIMEOUT = 300
+_service_lock = threading.RLock()
+_job_service = None
+_runtime_guard = None
+
+DOWNLOAD_PROGRESS_TEMPLATE = (
+    "download:RECLIP_PROGRESS "
+    "%(progress.{status,downloaded_bytes,total_bytes,total_bytes_estimate,speed,eta})j"
+)
+POSTPROCESS_PROGRESS_TEMPLATE = (
+    "postprocess:RECLIP_POSTPROCESS "
+    "%(progress.{status,postprocessor})j"
+)
+
+
+def _get_job_service():
+    """Initialize the durable service once for the container process."""
+    global _job_service, _runtime_guard
+    if _job_service is not None:
+        return _job_service
+    with _service_lock:
+        if _job_service is not None:
+            return _job_service
+        root = os.environ.get("RECLIP_DOWNLOAD_DIR", DOWNLOAD_DIR)
+        root_path = os.path.abspath(root)
+        internal = os.path.join(root_path, ".reclip")
+        guard = RuntimeGuard(os.path.join(internal, "runtime.lock"))
+        epoch = guard.acquire()
+        try:
+            store = JobStore(os.path.join(internal, "jobs.sqlite3"))
+            store.initialize()
+            service = JobService(store, root_path, epoch)
+            service.recover()
+        except Exception:
+            guard.close()
+            raise
+        _runtime_guard = guard
+        _job_service = service
+        return service
+
+
+def _service_error(exc):
+    if isinstance(exc, KeyError):
+        return jsonify({"error": "Job not found"}), 404
+    if isinstance(exc, ValueError):
+        return jsonify({"error": str(exc)}), 400
+    if isinstance(exc, FileNotFoundError):
+        return jsonify({"error": "File is no longer available"}), 410
+    if isinstance(exc, RuntimeError):
+        message = str(exc)
+        status = 503 if "restart" in message.lower() or "storage" in message.lower() else 409
+        return jsonify({"error": message}), status
+    return jsonify({"error": "Request could not be completed"}), 500
+
+
+def _empty_progress():
+    return normalize_download_progress({}, now=None)
+
+
+def apply_progress_event(job_id, event, now=None):
+    """Apply one parsed event without changing a terminal job."""
+    if now is None:
+        now = time.time()
+
+    with jobs_lock:
+        job = jobs.get(job_id)
+        if not job or job["status"] in ("done", "error"):
+            return
+
+        data = event.get("data", {}) if isinstance(event, dict) else {}
+        if not isinstance(data, dict):
+            return
+
+        if event.get("kind") == "download":
+            if data.get("status") == "downloading":
+                job["phase"] = "downloading"
+                job["progress"] = normalize_download_progress(data, now)
+            elif data.get("status") == "finished":
+                progress = normalize_download_progress(data, now)
+                progress["speed_bps"] = None
+                progress["eta_seconds"] = None
+                job["phase"] = "finalizing"
+                job["progress"] = progress
+        elif event.get("kind") == "postprocess":
+            job["phase"] = "processing"
+            job["progress"] = None
+
+
+def _mark_job_error(job_id, message):
+    with jobs_lock:
+        job = jobs.get(job_id)
+        if job and job["status"] not in ("done", "error"):
+            job["status"] = "error"
+            job["phase"] = "failed"
+            job["error"] = message
+            job["progress"] = None
 
 
 def is_safe_url(url):
@@ -45,10 +148,22 @@ def parse_ytdlp_json(stdout):
 
 
 def run_download(job_id, url, format_choice, format_id):
-    job = jobs[job_id]
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
 
-    cmd = ["yt-dlp", "--no-playlist", "-o", out_template]
+    cmd = [
+        "yt-dlp",
+        "--no-playlist",
+        "--newline",
+        "--progress",
+        "--progress-delta",
+        "0.5",
+        "--progress-template",
+        DOWNLOAD_PROGRESS_TEMPLATE,
+        "--progress-template",
+        POSTPROCESS_PROGRESS_TEMPLATE,
+        "-o",
+        out_template,
+    ]
 
     if format_choice == "audio":
         cmd += ["-x", "--audio-format", "mp3"]
@@ -62,17 +177,37 @@ def run_download(job_id, url, format_choice, format_id):
     # command execution.
     cmd += ["--", url]
 
+    last_error_lines = []
+
+    def handle_line(line):
+        event = parse_progress_line(line)
+        if event is not None:
+            apply_progress_event(job_id, event)
+            return
+
+        if line.startswith("ERROR:") or line.startswith("WARNING:"):
+            last_error_lines.append(line[:1000])
+            del last_error_lines[:-20]
+
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        if result.returncode != 0:
-            job["status"] = "error"
-            job["error"] = result.stderr.strip().split("\n")[-1]
+        with jobs_lock:
+            if job_id not in jobs:
+                return
+            jobs[job_id]["phase"] = "preparing"
+
+        returncode = run_streaming_process(
+            cmd,
+            handle_line,
+            timeout_seconds=DOWNLOAD_TIMEOUT,
+        )
+        if returncode != 0:
+            message = last_error_lines[-1] if last_error_lines else f"yt-dlp exited with code {returncode}"
+            _mark_job_error(job_id, message.replace("ERROR: ", ""))
             return
 
         files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))
         if not files:
-            job["status"] = "error"
-            job["error"] = "Download completed but no file was found"
+            _mark_job_error(job_id, "Download completed but no file was found")
             return
 
         if format_choice == "audio":
@@ -89,22 +224,43 @@ def run_download(job_id, url, format_choice, format_id):
                 except OSError:
                     pass
 
-        job["status"] = "done"
-        job["file"] = chosen
         ext = os.path.splitext(chosen)[1]
-        title = job.get("title", "").strip()
         # Sanitize title for filename
+        with jobs_lock:
+            job = jobs.get(job_id)
+            if not job or job["status"] == "error":
+                return
+            title = job.get("title", "").strip()
         if title:
             safe_title = "".join(c for c in title if c not in r'\/:*?"<>|').strip()[:100].strip()
-            job["filename"] = f"{safe_title}{ext}" if safe_title else os.path.basename(chosen)
+            filename = f"{safe_title}{ext}" if safe_title else os.path.basename(chosen)
         else:
-            job["filename"] = os.path.basename(chosen)
+            filename = os.path.basename(chosen)
+        with jobs_lock:
+            job = jobs.get(job_id)
+            if not job or job["status"] == "error":
+                return
+            complete_progress = _empty_progress()
+            complete_progress["percent"] = 100.0
+            job.update(
+                {
+                    "status": "done",
+                    "phase": "complete",
+                    "progress": complete_progress,
+                    "file": chosen,
+                    "filename": filename,
+                }
+            )
     except subprocess.TimeoutExpired:
-        job["status"] = "error"
-        job["error"] = "Download timed out (5 min limit)"
+        _mark_job_error(job_id, "Download timed out (5 min limit)")
+        # The process runner has already terminated the child process tree.
+        for f in glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*")):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
     except Exception as e:
-        job["status"] = "error"
-        job["error"] = str(e)
+        _mark_job_error(job_id, str(e))
 
 
 @app.route("/")
@@ -187,45 +343,88 @@ def get_playlist_info():
 
 @app.route("/api/download", methods=["POST"])
 def start_download():
-    data = request.json
-    url = data.get("url", "").strip()
-    format_choice = data.get("format", "video")
-    format_id = data.get("format_id")
-    title = data.get("title", "")
-
-    if not url:
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid request body"}), 400
+    url = data.get("url", "")
+    if not isinstance(url, str) or not url.strip():
         return jsonify({"error": "No URL provided"}), 400
-    if not is_safe_url(url):
+    if not is_safe_url(url.strip()):
         return jsonify({"error": "Invalid URL"}), 400
-
-    job_id = uuid.uuid4().hex[:10]
-    jobs[job_id] = {"status": "downloading", "url": url, "title": title}
-
-    thread = threading.Thread(target=run_download, args=(job_id, url, format_choice, format_id))
-    thread.daemon = True
-    thread.start()
-
-    return jsonify({"job_id": job_id})
+    try:
+        return jsonify(_get_job_service().create(data))
+    except Exception as exc:
+        return _service_error(exc)
 
 
 @app.route("/api/status/<job_id>")
 def check_status(job_id):
-    job = jobs.get(job_id)
-    if not job:
-        return jsonify({"error": "Job not found"}), 404
-    return jsonify({
-        "status": job["status"],
-        "error": job.get("error"),
-        "filename": job.get("filename"),
-    })
+    with jobs_lock:
+        job = jobs.get(job_id)
+        if job:
+            return jsonify({
+                "status": job["status"],
+                "error": job.get("error"),
+                "filename": job.get("filename"),
+                "phase": job.get("phase"),
+                "progress": job.get("progress"),
+            })
+    try:
+        return jsonify(_get_job_service().status(job_id))
+    except Exception as exc:
+        return _service_error(exc)
 
 
 @app.route("/api/file/<job_id>")
 def download_file(job_id):
-    job = jobs.get(job_id)
-    if not job or job["status"] != "done":
-        return jsonify({"error": "File not ready"}), 404
-    return send_file(job["file"], as_attachment=True, download_name=job["filename"])
+    with jobs_lock:
+        job = jobs.get(job_id)
+        if job:
+            if job["status"] != "done":
+                return jsonify({"error": "File not ready"}), 404
+            file_path = job["file"]
+            filename = job["filename"]
+            return send_file(file_path, as_attachment=True, download_name=filename)
+    try:
+        file_path, filename = _get_job_service().file_path(job_id)
+        return send_file(file_path, as_attachment=True, download_name=filename)
+    except Exception as exc:
+        return _service_error(exc)
+
+
+@app.route("/api/jobs")
+def list_jobs():
+    try:
+        limit = request.args.get("limit", default=50, type=int)
+        cursor = request.args.get("cursor")
+        return jsonify(_get_job_service().list_jobs(limit, cursor))
+    except Exception as exc:
+        return _service_error(exc)
+
+
+@app.route("/api/jobs/<job_id>/resume", methods=["POST"])
+def resume_job(job_id):
+    try:
+        return jsonify(_get_job_service().resume(job_id)), 202
+    except Exception as exc:
+        return _service_error(exc)
+
+
+@app.route("/api/jobs/<job_id>/restart", methods=["POST"])
+def restart_job(job_id):
+    try:
+        return jsonify(_get_job_service().restart(job_id)), 201
+    except Exception as exc:
+        return _service_error(exc)
+
+
+@app.route("/api/jobs/<job_id>", methods=["DELETE"])
+def delete_job(job_id):
+    try:
+        _get_job_service().delete(job_id)
+        return ("", 204)
+    except Exception as exc:
+        return _service_error(exc)
 
 
 if __name__ == "__main__":
