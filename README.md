@@ -36,6 +36,16 @@ Or with Docker:
 docker build -t reclip . && docker run -p 8899:8899 reclip
 ```
 
+## Configuration
+
+ReClip can be configured using the following environment variables:
+
+- **PORT** - the port the ReClip server listens on. Defaults to 8899.
+- **HOST** - the address the ReClip server binds to. Defaults to 127.0.0.1. Use 0.0.0.0 if you need ReClip to be accessible from other machines.
+- **RECLIP_NO_UPDATE** - set this to 1 to skip updating yt-dlp when ReClip starts. This can be useful if you manage yt-dlp yourself or are running ReClip without internet access.
+
+**Note:** When running the Docker image, **HOST** and **PORT** do not affect the server address because the Docker command binds Gunicorn to `0.0.0.0:8899`.
+
 ## Usage
 
 1. Paste one or more video URLs into the input box
