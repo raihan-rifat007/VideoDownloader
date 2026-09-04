@@ -376,6 +376,8 @@
       }
       .card-title { white-space: normal; }
       .controls { flex-wrap: wrap; }
+      .pill-group { width: 100%; }
+      .pill { flex: 1; padding-left: 10px; padding-right: 10px; }
       .fetch-btn { width: 100%; }
     }
   </style>
@@ -391,9 +393,11 @@
     <p class="hint">Multiple links? Separate with spaces, commas, or newlines.</p>
 
     <div class="controls">
-      <div class="pill-group">
-        <button class="pill active" data-format="video" onclick="setFormat(this)">MP4</button>
-        <button class="pill" data-format="audio" onclick="setFormat(this)">MP3</button>
+      <div class="pill-group" aria-label="Export format">
+        <button class="pill active" data-format="mp4" onclick="setFormat(this)">MP4</button>
+        <button class="pill" data-format="mkv" onclick="setFormat(this)">MKV</button>
+        <button class="pill" data-format="mov" onclick="setFormat(this)">MOV</button>
+        <button class="pill" data-format="mp3" onclick="setFormat(this)">MP3</button>
       </div>
       <button class="fetch-btn" id="goBtn" onclick="go()">Fetch</button>
     </div>
@@ -408,13 +412,14 @@
   </div>
 
   <script>
-    let currentFormat = 'video';
+    let currentFormat = 'mp4';
     let cardData = [];
 
     function setFormat(btn) {
       document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentFormat = btn.dataset.format;
+      cardData.forEach((_, idx) => renderCard(idx));
     }
 
     function parseUrls(text) {
@@ -435,6 +440,7 @@
     }
 
     function friendlyError(err) {
+      if (err.includes('Bilibili blocked this server')) return 'Bilibili blocked this server (HTTP 412) — configure cookies or a proxy and retry';
       if (err.includes('Unsupported URL')) return 'This URL is not supported';
       if (err.includes('Video unavailable')) return 'Video is unavailable or private';
       if (err.includes('Private video')) return 'This video is private';
@@ -562,7 +568,7 @@
 
       // Ready / downloading / done / error states
       el.className = 'card';
-      const isAudio = currentFormat === 'audio';
+      const isAudio = currentFormat === 'mp3';
 
       let thumbHtml;
       if (isAudio) {

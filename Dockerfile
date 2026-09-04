@@ -14,7 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY . .
 
-RUN useradd -m -u 1000 reclip && \
+# Normalize shell scripts inside the Linux image as a fallback for Windows
+# checkouts. This is a no-op for the LF files used by Linux/macOS checkouts.
+RUN sed -i 's/\r$//' /app/docker-entrypoint.sh && \
+    useradd -m -u 1000 reclip && \
     mkdir -p /app/downloads && \
     chown -R reclip:reclip /app
 USER reclip

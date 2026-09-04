@@ -5,6 +5,10 @@ services:
     container_name: reclip
     ports:
       - "8899:8899"
+    environment:
+      YTDLP_COOKIES_FILE: ${YTDLP_COOKIES_FILE:-}
+      YTDLP_PROXY: ${YTDLP_PROXY:-}
+      YTDLP_USER_AGENT: ${YTDLP_USER_AGENT:-}
     volumes:
       - reclip-downloads:/app/downloads
     restart: unless-stopped

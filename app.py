@@ -12,6 +12,79 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 jobs = {}
 
+VIDEO_EXPORT_FORMATS = frozenset({"mp4", "mkv", "mov"})
+SUPPORTED_EXPORT_FORMATS = VIDEO_EXPORT_FORMATS | {"mp3"}
+LEGACY_EXPORT_FORMATS = {"video": "mp4", "audio": "mp3"}
+YTDLP_RUNTIME_OPTIONS = (
+    ("YTDLP_COOKIES_FILE", "--cookies"),
+    ("YTDLP_PROXY", "--proxy"),
+    ("YTDLP_USER_AGENT", "--user-agent"),
+)
+
+
+def normalize_export_format(value):
+    """Return a supported export format, including legacy API aliases."""
+    if not isinstance(value, str):
+        return None
+
+    normalized = value.strip().lower()
+    normalized = LEGACY_EXPORT_FORMATS.get(normalized, normalized)
+    return normalized if normalized in SUPPORTED_EXPORT_FORMATS else None
+
+
+def build_ytdlp_base_command(no_playlist=False):
+    """Build shared yt-dlp arguments from trusted deployment settings."""
+    cmd = ["yt-dlp"]
+    for environment_name, option in YTDLP_RUNTIME_OPTIONS:
+        value = os.environ.get(environment_name, "").strip()
+        if value:
+            cmd += [option, value]
+    if no_playlist:
+        cmd.append("--no-playlist")
+    return cmd
+
+
+def format_ytdlp_error(stderr):
+    """Return a concise error, with deployment guidance for Bilibili 412."""
+    stderr = (stderr or "").strip()
+    if "[BiliBili]" in stderr and "HTTP Error 412" in stderr:
+        return (
+            "Bilibili blocked this server (HTTP 412). Mount a fresh browser "
+            "cookies.txt via YTDLP_COOKIES_FILE and/or configure YTDLP_PROXY, "
+            "then retry."
+        )
+    return (
+        stderr.splitlines()[-1]
+        if stderr
+        else "yt-dlp failed without an error message"
+    )
+
+
+def build_download_command(url, export_format, format_id, out_template):
+    """Build a yt-dlp command that produces the requested container."""
+    cmd = build_ytdlp_base_command(no_playlist=True)
+    cmd += ["-o", out_template]
+
+    if export_format == "mp3":
+        cmd += ["-x", "--audio-format", "mp3"]
+    else:
+        selector = (
+            f"{format_id}+bestaudio/best"
+            if format_id
+            else "bestvideo+bestaudio/best"
+        )
+        cmd += [
+            "-f",
+            selector,
+            "--merge-output-format",
+            export_format,
+            "--recode-video",
+            export_format,
+        ]
+
+    cmd.append(url)
+    return cmd
+
 
 def parse_ytdlp_json(stdout):
     """Parse yt-dlp JSON output.
@@ -29,26 +102,16 @@ def parse_ytdlp_json(stdout):
     raise ValueError("yt-dlp returned no data")
 
 
-def run_download(job_id, url, format_choice, format_id):
+def run_download(job_id, url, export_format, format_id):
     job = jobs[job_id]
     out_template = os.path.join(DOWNLOAD_DIR, f"{job_id}.%(ext)s")
-
-    cmd = ["yt-dlp", "--no-playlist", "-o", out_template]
-
-    if format_choice == "audio":
-        cmd += ["-x", "--audio-format", "mp3"]
-    elif format_id:
-        cmd += ["-f", f"{format_id}+bestaudio/best", "--merge-output-format", "mp4"]
-    else:
-        cmd += ["-f", "bestvideo+bestaudio/best", "--merge-output-format", "mp4"]
-
-    cmd.append(url)
+    cmd = build_download_command(url, export_format, format_id, out_template)
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
             job["status"] = "error"
-            job["error"] = result.stderr.strip().split("\n")[-1]
+            job["error"] = format_ytdlp_error(result.stderr)
             return
 
         files = glob.glob(os.path.join(DOWNLOAD_DIR, f"{job_id}.*"))
@@ -57,12 +120,19 @@ def run_download(job_id, url, format_choice, format_id):
             job["error"] = "Download completed but no file was found"
             return
 
-        if format_choice == "audio":
-            target = [f for f in files if f.endswith(".mp3")]
-            chosen = target[0] if target else files[0]
-        else:
-            target = [f for f in files if f.endswith(".mp4")]
-            chosen = target[0] if target else files[0]
+        target = [
+            f
+            for f in files
+            if os.path.splitext(f)[1].lower() == f".{export_format}"
+        ]
+        if not target:
+            job["status"] = "error"
+            job["error"] = (
+                "Download completed but no "
+                f"{export_format.upper()} file was produced"
+            )
+            return
+        chosen = target[0]
 
         for f in files:
             if f != chosen:
@@ -101,11 +171,11 @@ def get_info():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    cmd = ["yt-dlp", "--no-playlist", "-j", url]
+    cmd = build_ytdlp_base_command(no_playlist=True) + ["-j", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
-            return jsonify({"error": result.stderr.strip().split("\n")[-1]}), 400
+            return jsonify({"error": format_ytdlp_error(result.stderr)}), 400
 
         info = parse_ytdlp_json(result.stdout)
 
@@ -147,11 +217,11 @@ def get_playlist_info():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    cmd = ["yt-dlp", "--flat-playlist", "-J", url]
+    cmd = build_ytdlp_base_command() + ["--flat-playlist", "-J", url]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
-            return jsonify({"error": result.stderr.strip().split("\n")[-1]}), 400
+            return jsonify({"error": format_ytdlp_error(result.stderr)}), 400
 
         info = json.loads(result.stdout)
         entries = info.get("entries", [])
@@ -165,19 +235,27 @@ def get_playlist_info():
 
 @app.route("/api/download", methods=["POST"])
 def start_download():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     url = data.get("url", "").strip()
-    format_choice = data.get("format", "video")
+    export_format = normalize_export_format(data.get("format", "mp4"))
     format_id = data.get("format_id")
     title = data.get("title", "")
 
     if not url:
         return jsonify({"error": "No URL provided"}), 400
+    if export_format is None:
+        supported = ", ".join(sorted(SUPPORTED_EXPORT_FORMATS))
+        return jsonify({
+            "error": f"Unsupported export format. Choose one of: {supported}"
+        }), 400
 
     job_id = uuid.uuid4().hex[:10]
     jobs[job_id] = {"status": "downloading", "url": url, "title": title}
 
-    thread = threading.Thread(target=run_download, args=(job_id, url, format_choice, format_id))
+    thread = threading.Thread(
+        target=run_download,
+        args=(job_id, url, export_format, format_id),
+    )
     thread.daemon = True
     thread.start()
 
