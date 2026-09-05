@@ -444,6 +444,8 @@
       if (err.includes('geo')) return 'Video not available in your region';
       if (err.includes('timed out') || err.includes('Timed out')) return 'Request timed out — try again';
       if (err.includes('network') || err.includes('Network')) return 'Network error — check your connection';
+      if (err.includes('photo carousel')) return 'Instagram photo carousel — image download is not supported';
+      if (err.includes('No video formats found')) return 'No video found — this post may be photos only';
       return err.length > 80 ? err.slice(0, 80) + '...' : err;
     }
 
@@ -584,10 +586,20 @@
       if (c.status === 'ready') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Download</button>${qualityChips}`;
       } else if (c.status === 'downloading') {
-        actionHtml = `<span class="card-status downloading"><span class="spin"></span> Downloading...</span>`;
+        const label = (c.phase === 'Converting')
+          ? 'Converting (WhatsApp)…'
+          : (c.phase === 'Downloading' ? 'Downloading…' : 'Downloading…');
+        // Only show a live % during the actual download (yt-dlp). ffmpeg progress
+        // is misleading, so no % while converting.
+        const pct = (c.phase !== 'Converting' && typeof c.progress === 'number' && c.progress > 0)
+          ? `<span class="card-status downloading"> ${c.progress}%</span>` : '';
+        actionHtml = `<span class="card-status downloading"><span class="spin"></span> ${esc(label)}${pct}</span>`;
       } else if (c.status === 'done') {
+        const path = c.path ? `<div class="card-status done">Saved to: ${esc(c.path)}</div>` : '';
+        const warn = c.warning ? `<div class="card-status error">${esc(c.warning)}</div>` : '';
         actionHtml = `<button class="card-dl-btn done" onclick="saveCard(${idx})">Save</button>
-          <span class="card-status done">${esc(c.filename || '')}</span>`;
+          <span class="card-status done">${esc(c.filename || '')}</span>
+          ${path}${warn}`;
       } else if (c.status === 'error') {
         actionHtml = `<button class="card-dl-btn" onclick="dlCard(${idx})">Retry</button>
           <span class="card-status error">${esc(friendlyError(c.error || 'Download failed'))}</span>`;
@@ -662,6 +674,8 @@
             clearInterval(iv);
             c.status = 'done';
             c.filename = data.filename;
+            c.path = data.path || null;
+            c.warning = data.warning || null;
             renderCard(idx);
             saveCard(idx);
           } else if (data.status === 'error') {
@@ -669,6 +683,10 @@
             c.status = 'error';
             c.error = data.error;
             renderCard(idx);
+          } else {
+            // still downloading: surface phase + live %
+            c.phase = data.phase || 'Downloading';
+            c.progress = typeof data.progress === 'number' ? data.progress : c.progress;
           }
         } catch {
           clearInterval(iv);
