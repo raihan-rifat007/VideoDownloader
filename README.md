@@ -2,12 +2,12 @@
 
 A self-hosted, open-source video and audio downloader with a clean web UI. Paste links from YouTube, TikTok, Instagram, Twitter/X, and 1000+ other sites — download as MP4 or MP3.
 
-![Python](https://img.shields.io/badge/python-3.8+-blue)
+![Go](https://img.shields.io/badge/go-1.27+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 https://github.com/user-attachments/assets/419d3e50-c933-444b-8cab-a9724986ba05
 
-![ReClip MP3 Mode](assets/preview-mp3.png)
+![ReClip MP3 Mode](assets/download.png)
 
 ## Features
 
@@ -17,24 +17,24 @@ https://github.com/user-attachments/assets/419d3e50-c933-444b-8cab-a9724986ba05
 - Bulk downloads — paste multiple URLs at once
 - Automatic URL deduplication
 - Clean, responsive UI — no frameworks, no build step
-- Single Python file backend (~150 lines)
+- Single-file Go backend — stdlib only, compiles to one binary
 
 ## Quick Start
 
 ```bash
-brew install yt-dlp ffmpeg    # or apt install ffmpeg && pip install yt-dlp
-git clone https://github.com/averygan/reclip.git
+brew install go ffmpeg yt-dlp   # or apt install golang ffmpeg
+git clone https://github.com/azhai/reclip.git
 cd reclip
-./reclip.sh
+make
+./bin/reclip
 ```
+
+> yt-dlp needs no manual install: the Go service uses the one on `PATH`, or
+> auto-downloads a standalone build into `./bin` on first start. It self-updates
+> only that standalone build on every start (skip with `RECLIP_NO_UPDATE=1`); a
+> system yt-dlp (e.g. Homebrew) is left to its own package manager to update.
 
 Open **http://localhost:8899**.
-
-Or with Docker:
-
-```bash
-docker build -t reclip . && docker run -p 8899:8899 reclip
-```
 
 ## Usage
 
@@ -50,12 +50,21 @@ Anything [yt-dlp supports](https://github.com/yt-dlp/yt-dlp/blob/master/supporte
 
 YouTube, TikTok, Instagram, Twitter/X, Reddit, Facebook, Vimeo, Twitch, Dailymotion, SoundCloud, Loom, Streamable, Pinterest, Tumblr, Threads, LinkedIn, and many more.
 
+## Chrome Extension (optional)
+
+A lightweight companion extension lives in [`extension/`](extension/) (Manifest V3, vanilla JS, no build step):
+
+- **Right-click** any video link, media element, or page → *ReClip → 用 ReClip 下载* opens the panel with the URL pre-filled and auto-fetches
+- **Toolbar popup** — download the current tab, toggle MP4/MP3, and set the server address (default `http://127.0.0.1:8899`)
+
+Install: open `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the `extension/` directory.
+
 ## Stack
 
-- **Backend:** Python + Flask (~150 lines)
+- **Backend:** Go (stdlib `net/http`, single binary)
 - **Frontend:** Vanilla HTML/CSS/JS (single file, no build step)
-- **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) + [ffmpeg](https://ffmpeg.org/)
-- **Dependencies:** 2 (Flask, yt-dlp)
+- **Download engine:** [yt-dlp](https://github.com/yt-dlp/yt-dlp) (auto-downloaded standalone binary, Go-managed) + [ffmpeg](https://ffmpeg.org/)
+- **Dependencies:** 0 Go packages — no Python; only ffmpeg needs installing
 
 ## Disclaimer
 

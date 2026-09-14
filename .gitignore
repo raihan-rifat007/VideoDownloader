@@ -1,10 +1,11 @@
-venv/
-downloads/
-__pycache__/
-*.pyc
-assets/*.mov
 .DS_Store
+.codebuddy/
 .env
 .env.local
 .env.production
 .env.development
+
+assets/*.mov
+bin/
+downloads/
+settings.json
