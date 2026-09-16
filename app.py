@@ -14,13 +14,6 @@ jobs = {}
 
 
 def parse_ytdlp_json(stdout):
-    """Parse yt-dlp JSON output.
-
-    With ``-j`` yt-dlp prints one JSON object per line. Some extractors
-    emit multiple videos even with ``--no-playlist``, so stdout contains
-    several objects and a plain ``json.loads`` raises "Extra data".
-    Return the first valid object.
-    """
     for line in stdout.splitlines():
         line = line.strip()
         if not line:
@@ -75,7 +68,6 @@ def run_download(job_id, url, format_choice, format_id):
         job["file"] = chosen
         ext = os.path.splitext(chosen)[1]
         title = job.get("title", "").strip()
-        # Sanitize title for filename
         if title:
             safe_title = "".join(c for c in title if c not in r'\/:*?"<>|').strip()[:100].strip()
             job["filename"] = f"{safe_title}{ext}" if safe_title else os.path.basename(chosen)
@@ -109,7 +101,6 @@ def get_info():
 
         info = parse_ytdlp_json(result.stdout)
 
-        # Build quality options — keep best format per resolution
         best_by_height = {}
         for f in info.get("formats", []):
             height = f.get("height")
