@@ -163,28 +163,28 @@ Whether you're archiving your own content, downloading public-domain media, or j
 
 ### Main Interface
 
-<img src="assets/screenshot-main.png" alt="Main Interface" width="80%" />
+<img src="static/Screenshot.jpg" alt="Main Interface" width="80%" />
 
 <br />
 <br />
 
 ### MP4 Download with Quality Picker
 
-<img src="assets/screenshot-mp4.png" alt="MP4 Download" width="80%" />
+<img src="static/Screenshot-mp4.jpg" alt="MP4 Download" width="80%" />
 
 <br />
 <br />
 
 ### MP3 Audio Mode
 
-<img src="assets/screenshot-mp3.png" alt="MP3 Mode" width="80%" />
+<img src="static/Screenshot-mp3.jpg" alt="MP3 Mode" width="80%" />
 
 <br />
 <br />
 
 ### Bulk Download
 
-<img src="assets/screenshot-bulk.png" alt="Bulk Download" width="80%" />
+<img src="static/Screenshot-bulk.jpg" alt="Bulk Download" width="80%" />
 
 </div>
 
