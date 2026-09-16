@@ -886,9 +886,6 @@ Have a feature request? [Open an issue](https://github.com/yourname/videodownloa
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                          CONTRIBUTING                              -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Contributing
 
@@ -936,25 +933,21 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 
 ### Contributors
 
-<a href="https://github.com/yourname/videodownloader/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=yourname/videodownloader" alt="Contributors" />
+<a href="https://github.com/raihan-rifat007/videodownloader/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=raihan-rifat007/videodownloader" alt="Contributors" />
 </a>
 
 ---
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                          STAR HISTORY                              -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Star History
 
 <div align="center">
 
-<a href="https://star-history.com/#yourname/videodownloader&Date">
+<a href="https://star-history.com/#raihan-rifat007/videodownloader&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=yourname/videodownloader&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=yourname/videodownloader&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=yourname/videodownloader&type=Date" width="80%" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=raihan-rifat007/videodownloader&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=raihan-rifat007/videodownloader&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=raihan-rifat007/videodownloader&type=Date" width="80%" />
   </picture>
 </a>
 
@@ -963,15 +956,12 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 
 **If Video Downloader saved you time, consider giving it a star — it genuinely helps.**
 
-[![Star this repo](https://img.shields.io/badge/⭐_Star_this_repo-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/yourname/videodownloader/stargazers)
+[![Star this repo](https://img.shields.io/badge/⭐_Star_this_repo-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/raihan-rifat007/videodownloader/stargazers)
 
 </div>
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                        ACKNOWLEDGMENTS                             -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Acknowledgments
 
@@ -984,10 +974,6 @@ Video Downloader stands on the shoulders of giants:
 - **Everyone who files an issue, opens a PR, or stars the repo** — you make open source worth doing.
 
 ---
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                           DISCLAIMER                               -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Disclaimer
 
