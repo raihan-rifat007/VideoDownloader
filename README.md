@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/downloader.png" alt="Video Downloader Banner" width="100%" />
+<img src="static/downloader.png" alt="Video Downloader Banner" width="100%" />
 
 <br />
 <br />
