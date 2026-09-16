@@ -1,10 +1,6 @@
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                          VIDEO DOWNLOADER                          -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-
 <div align="center">
 
-<img src="assets/banner.png" alt="Video Downloader Banner" width="100%" />
+<img src="static/downloader.png" alt="Video Downloader Banner" width="20%" />
 
 <br />
 <br />
@@ -17,27 +13,21 @@
 
 <br />
 
-<!-- ── Primary Badges ─────────────────────────────────────────────── -->
-
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-3.x-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![yt-dlp](https://img.shields.io/badge/yt--dlp-latest-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://github.com/yt-dlp/yt-dlp)
 [![ffmpeg](https://img.shields.io/badge/ffmpeg-6.x-007808?style=for-the-badge&logo=ffmpeg&logoColor=white)](https://ffmpeg.org/)
 
-<!-- ── Meta Badges ────────────────────────────────────────────────── -->
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
-[![Maintained](https://img.shields.io/badge/Maintained-yes-success?style=flat-square)](https://github.com/yourname/videodownloader/graphs/commit-activity)
-[![Docker Pulls](https://img.shields.io/docker/pulls/yourname/videodownloader?style=flat-square&logo=docker)](https://hub.docker.com/r/yourname/videodownloader)
-[![GitHub Stars](https://img.shields.io/github/stars/yourname/videodownloader?style=flat-square&logo=github)](https://github.com/yourname/videodownloader/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/yourname/videodownloader?style=flat-square&logo=github)](https://github.com/yourname/videodownloader/network)
-[![GitHub Issues](https://img.shields.io/github/issues/yourname/videodownloader?style=flat-square&logo=github)](https://github.com/yourname/videodownloader/issues)
-[![Last Commit](https://img.shields.io/github/last-commit/yourname/videodownloader?style=flat-square&logo=github)](https://github.com/yourname/videodownloader/commits/main)
+[![Maintained](https://img.shields.io/badge/Maintained-yes-success?style=flat-square)](https://github.com/raiha-rifat007/videodownloader/graphs/commit-activity)
+[![Docker Pulls](https://img.shields.io/docker/pulls/raihan-rifat007/videodownloader?style=flat-square&logo=docker)](https://hub.docker.com/r/raihan-rifat007/videodownloader)
+[![GitHub Stars](https://img.shields.io/github/stars/raihan-rifat007/videodownloader?style=flat-square&logo=github)](https://github.com/raihan-rifat007/videodownloader/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/raihan-rifat007/videodownloader?style=flat-square&logo=github)](https://github.com/raihan-rifat007/videodownloader/network)
+[![GitHub Issues](https://img.shields.io/github/issues/raihan-rifat007/videodownloader?style=flat-square&logo=github)](https://github.com/raihan-rifat007/videodownloader/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/raihan-rifat007/videodownloader?style=flat-square&logo=github)](https://github.com/raihan-rifat007/videodownloader/commits/main)
 
 <br />
-
-<!-- ── Quick Links ────────────────────────────────────────────────── -->
 
 [**Features**](#-features) &nbsp;·&nbsp;
 [**Quick Start**](#-quick-start) &nbsp;·&nbsp;
@@ -51,10 +41,6 @@
 </div>
 
 ---
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                            TABLE OF CONTENTS                       -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 <details open>
 <summary><kbd>Table of Contents</kbd></summary>
@@ -93,10 +79,6 @@
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                              OVERVIEW                              -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-
 ## Overview
 
 **Video Downloader** is a self-hosted, zero-dependency web application for downloading videos and extracting audio from **1000+ supported platforms**. Built on top of the battle-tested [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) engine, it provides a clean brutalist web interface for fetching, previewing, and saving media — without ads, telemetry, or account registration.
@@ -106,10 +88,6 @@ Whether you're archiving your own content, downloading public-domain media, or j
 > **Philosophy:** Self-hosted first. Minimal footprint. No bloat. Just a Python file, a shell script, and a beautiful UI.
 
 ---
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                              FEATURES                              -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Features
 
@@ -178,9 +156,6 @@ Whether you're archiving your own content, downloading public-domain media, or j
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                            SCREENSHOTS                             -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Screenshots
 
@@ -215,10 +190,6 @@ Whether you're archiving your own content, downloading public-domain media, or j
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                             TECH STACK                             -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-
 ## Tech Stack
 
 <div align="center">
@@ -236,10 +207,6 @@ Whether you're archiving your own content, downloading public-domain media, or j
 </div>
 
 ---
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                            QUICK START                             -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Quick Start
 
@@ -382,10 +349,6 @@ The server will start on **http://127.0.0.1:8899** by default.
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                          CONFIGURATION                             -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-
 ## Configuration
 
 Video Downloader is configured entirely through **environment variables**. No config files, no database, no surprises.
@@ -418,9 +381,6 @@ docker run -d \
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                            API REFERENCE                           -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## API Reference
 
@@ -504,8 +464,8 @@ All endpoints accept and return JSON unless noted otherwise. Base URL is `http:/
 |:------|:-----|:--------:|:------------|
 | `url` | string | ✅ | Source video URL |
 | `format` | string | ✅ | `"video"` or `"audio"` |
-| `format_id` | string | ❌ | yt-dlp format ID (from `/api/info`) |
-| `title` | string | ❌ | Used for the final filename |
+| `format_id` | string | ❎ | yt-dlp format ID (from `/api/info`) |
+| `title` | string | ❎ | Used for the final filename |
 
 **Response `200 OK`:**
 
@@ -552,9 +512,6 @@ Content-Type: application/octet-stream
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                         SUPPORTED SITES                            -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Supported Sites
 
@@ -606,9 +563,6 @@ Video Downloader inherits the full extractor catalog from yt-dlp — **over 1000
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                        PROJECT STRUCTURE                           -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Project Structure
 
@@ -635,9 +589,6 @@ videodownloader/
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                           DEVELOPMENT                              -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Development
 
@@ -680,9 +631,6 @@ pytest tests/
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                           DEPLOYMENT                               -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Deployment
 
@@ -751,10 +699,6 @@ sudo nginx -t && sudo systemctl reload nginx
 > ⚠️ **Cloud note:** Many free tiers block `yt-dlp` traffic. Prefer residential IPs or self-hosted.
 
 ---
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                        TROUBLESHOOTING                             -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Troubleshooting
 
@@ -833,10 +777,6 @@ yt-dlp downloads at the speed of your connection. You can speed things up by:
 
 ---
 
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                                FAQ                                 -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-
 ## FAQ
 
 <details>
@@ -903,10 +843,6 @@ Because soft, glassmorphic, neumorphic dashboards are everywhere. Brutalism is h
 </details>
 
 ---
-
-<!-- ═══════════════════════════════════════════════════════════════════ -->
-<!--                             ROADMAP                                -->
-<!-- ═══════════════════════════════════════════════════════════════════ -->
 
 ## Roadmap
 
