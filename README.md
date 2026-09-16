@@ -813,4 +813,223 @@ No. Video Downloader has no login. If you expose it publicly, put it behind HTTP
 </details>
 
 <details>
-<summary><b>Can I run it on a Raspberry Pi?</b></su
+<summary><b>Can I run it on a Raspberry Pi?</b></summary>
+
+<br />
+
+Yes. It runs fine on ARM64 — the Python backend is tiny and yt-dlp is pure Python. ffmpeg is the only resource-heavy dependency, and even that runs comfortably on a Pi 4.
+
+</details>
+
+<details>
+<summary><b>Why is the UI brutalist?</b></summary>
+
+<br />
+
+Because soft, glassmorphic, neumorphic dashboards are everywhere. Brutalism is honest, high-contrast, and memorable — and it pairs beautifully with a utility tool.
+
+</details>
+
+---
+
+Roadmap
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+Shipped
+
+☑ Core download engine
+☑ MP4 / MP3 format selection
+☑ Quality picker
+☑ Bulk URL input
+☑ Playlist expansion
+☑ Docker support
+☑ Brutalist UI redesign
+☑ Skeleton loaders
+☑ Friendly error messages
+
+</td>
+<td width="50%" valign="top">
+
+Planned
+
+☐ Subtitle download (SRT / VTT)
+☐ Cookie authentication for private videos
+☐ Download history persistence (SQLite)
+☐ Webhook notifications on completion
+☐ Progress bar with percentage
+☐ Multi-language UI (i18n)
+☐ Optional API key authentication
+☐ Rate limiting
+☐ Prometheus metrics endpoint
+☐ Helm chart for Kubernetes
+
+</td>
+</tr>
+</table>
+
+Have a feature request? Open an issue — we love a good idea.
+
+---
+
+Contributing
+
+Contributions are what make open source amazing. Any contribution you make is greatly appreciated.
+
+How to contribute
+
+1. Fork the repository
+2. Create your feature branch
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+3. Commit your changes
+   ```bash
+   git commit -m "feat: add amazing feature"
+   ```
+4. Push to the branch
+   ```bash
+   git push origin feature/amazing-feature
+   ```
+5. Open a Pull Request
+
+Commit convention
+
+This project follows Conventional Commits:
+
+Prefix Use for
+feat: New features
+fix: Bug fixes
+docs: Documentation
+style: Formatting, no code change
+refactor: Code restructure
+perf: Performance improvements
+test: Adding tests
+chore: Build/tooling
+
+Development guidelines
+
+· Read the Development section
+· Keep PRs focused — one feature or fix per PR
+· Update the README for any user-visible change
+· Add screenshots for UI changes
+· Respect the existing brutalist design language
+
+Contributors
+
+<a href="https://github.com/yourname/videodownloader/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=yourname/videodownloader" alt="Contributors" />
+</a>
+
+---
+
+Star History
+
+<div align="center">
+
+<a href="https://star-history.com/#yourname/videodownloader&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=yourname/videodownloader&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=yourname/videodownloader&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=yourname/videodownloader&type=Date" width="80%" />
+  </picture>
+</a>
+
+<br />
+<br />
+
+If Video Downloader saved you time, consider giving it a star — it genuinely helps.
+
+https://img.shields.io/badge/Star_this_repo-181717?style=for-the-badge&logo=github&logoColor=white
+
+</div>
+
+---
+
+Acknowledgments
+
+Video Downloader stands on the shoulders of giants:
+
+· yt-dlp — the engine that does all the heavy lifting. Without this extraordinary project, Video Downloader would not exist.
+· ffmpeg — the universal media toolkit, quietly powering every merge and transcode.
+· Flask — the minimal, elegant web framework that keeps the backend tiny.
+· Archivo Black and DM Mono — the typefaces that give the UI its brutalist soul.
+· Everyone who files an issue, opens a PR, or stars the repo — you make open source worth doing.
+
+---
+
+Disclaimer
+
+This tool is provided for personal, educational, and legitimate use only.
+
+· Users are solely responsible for how they use this software.
+· Downloading copyrighted content without permission is illegal in most jurisdictions.
+· Always comply with the terms of service of the platforms you access.
+· The maintainers assume no liability for misuse, legal consequences, or damages arising from use of this tool.
+· If you are a content owner and believe this tool facilitates infringement of your rights, please open an issue and we will respond promptly.
+
+Do the right thing. Respect creators.
+
+---
+
+License
+
+Distributed under the MIT License. See LICENSE for full text.
+
+```
+MIT License
+
+Copyright (c) 2025 Video Downloader Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+<div align="center">
+
+<br />
+
+Built with stubbornness, brutalist taste, and a deep love for open source.
+
+<br />
+
+https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white
+https://img.shields.io/badge/Issues-FF5722?style=for-the-badge&logo=github&logoColor=white
+https://img.shields.io/badge/Discussions-B78AFF?style=for-the-badge&logo=github&logoColor=white
+
+<br />
+
+<sub>If this project helped you, consider buying the maintainer a coffee. No pressure — a star works too.</sub>
+
+<br />
+<br />
+
+<a href="#top">
+  <img src="https://img.shields.io/badge/Back_to_Top-0A0A0A?style=for-the-badge" alt="Back to top" />
+</a>
+
+<br />
+<br />
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=24&height=120&section=footer" width="100%" />
+
+</div>
