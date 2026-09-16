@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/banner.png" alt="Video Downloader Banner" width="100%" />
+<img src="assets/downloader.png" alt="Video Downloader Banner" width="100%" />
 
 <br />
 <br />
@@ -20,12 +20,12 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](CONTRIBUTING.md)
-[![Maintained](https://img.shields.io/badge/Maintained-yes-success?style=flat-square)](https://github.com/yourname/videodownloader/graphs/commit-activity)
-[![Docker Pulls](https://img.shields.io/docker/pulls/yourname/videodownloader?style=flat-square&logo=docker)](https://hub.docker.com/r/yourname/videodownloader)
-[![GitHub Stars](https://img.shields.io/github/stars/yourname/videodownloader?style=flat-square&logo=github)](https://github.com/yourname/videodownloader/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/yourname/videodownloader?style=flat-square&logo=github)](https://github.com/yourname/videodownloader/network)
-[![GitHub Issues](https://img.shields.io/github/issues/yourname/videodownloader?style=flat-square&logo=github)](https://github.com/yourname/videodownloader/issues)
-[![Last Commit](https://img.shields.io/github/last-commit/yourname/videodownloader?style=flat-square&logo=github)](https://github.com/yourname/videodownloader/commits/main)
+[![Maintained](https://img.shields.io/badge/Maintained-yes-success?style=flat-square)](https://github.com/raihan-rifat007/videodownloader/graphs/commit-activity)
+[![Docker Pulls](https://img.shields.io/docker/pulls/raihan-rifat007/videodownloader?style=flat-square&logo=docker)](https://hub.docker.com/r/raihan-rifat007/videodownloader)
+[![GitHub Stars](https://img.shields.io/github/stars/raihan-rifat007/videodownloader?style=flat-square&logo=github)](https://github.com/raihan-rifat007/videodownloader/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/raihan-rifat007/videodownloader?style=flat-square&logo=github)](https://github.com/raihan-rifat007/videodownloader/network)
+[![GitHub Issues](https://img.shields.io/github/issues/raihan-rifat007/videodownloader?style=flat-square&logo=github)](https://github.com/raihan-rifat007/videodownloader/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/raihan-rifat007/videodownloader?style=flat-square&logo=github)](https://github.com/raihan-rifat007/videodownloader/commits/main)
 
 <br />
 
@@ -920,7 +920,7 @@ Development guidelines
 Contributors
 
 <a href="https://github.com/yourname/videodownloader/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=yourname/videodownloader" alt="Contributors" />
+  <img src="https://contrib.rocks/image?repo=raihan-rifat007/videodownloader" alt="Contributors" />
 </a>
 
 ---
@@ -929,11 +929,11 @@ Star History
 
 <div align="center">
 
-<a href="https://star-history.com/#yourname/videodownloader&Date">
+<a href="https://star-history.com/#raihan-rifat007/videodownloader&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=yourname/videodownloader&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=yourname/videodownloader&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=yourname/videodownloader&type=Date" width="80%" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=raihan-rifat007/videodownloader&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=raihan-rifat007/videodownloader&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=raihan-rifat007/videodownloader&type=Date" width="80%" />
   </picture>
 </a>
 
@@ -1011,11 +1011,9 @@ SOFTWARE.
 Built with stubbornness, brutalist taste, and a deep love for open source.
 
 <br />
-
 https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white
 https://img.shields.io/badge/Issues-FF5722?style=for-the-badge&logo=github&logoColor=white
 https://img.shields.io/badge/Discussions-B78AFF?style=for-the-badge&logo=github&logoColor=white
-
 <br />
 
 <sub>If this project helped you, consider buying the maintainer a coffee. No pressure — a star works too.</sub>
