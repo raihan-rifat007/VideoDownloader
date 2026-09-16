@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Downloader · Ads Free Media Downloader</title>
+  <link rel="icon" type="image/png" href="/static/prime.png">
+  <link rel="apple-touch-icon" href="/static/prime.png">
+  <meta property="og:title" content="Video Downloader - Ads Free Media Downloader">
+  <meta property="og:description" content="Download videos from YouTube, Facebook, Instagram and 1000+ platforms for free.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Video Downloader - Ads Free Media Downloader">
+  <meta name="twitter:description" content="Download videos from any platform for free.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0A0A0A;
+      --paper: #141414;
+      --ink: #FFFFFF;
+      --muted: #7A7A7A;
+      --soft: #1E1E1E;
+      --border: #2A2A2A;
+      --accent: #FFE500;
+      --accent-2: #FF5722;
+      --cyan: #00E5FF;
+      --lime: #B4FF3A;
+      --pink: #FF5C8A;
+      --purple: #B78AFF;
+      --success: #4ADE80;
+      --error: #FF3B30;
+
+      --b: 3px solid var(--ink);
+      --b2: 2px solid var(--ink);
+      --b3: 3px solid var(--border);
+
+      --sh-sm: 3px 3px 0 var(--ink);
+      --sh: 5px 5px 0 var(--ink);
+      --sh-lg: 7px 7px 0 var(--ink);
+
+      --r-sm: 6px;
+      --r: 10px;
+      --r-lg: 14px;
+    }
+
+    [data-theme="light"] {
+      --bg: #FFF8E7;
+      --paper: #FFFFFF;
+      --ink: #0A0A0A;
+      --muted: #6A6A6A;
+      --soft: #F5EFE0;
+      --border: #0A0A0A;
+      --accent: #FFE500;
+      --accent-2: #FF5722;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Mono', monospace;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-size: 15px;
+      line-height: 1.6;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background-image: radial-gradient(var(--ink) 1px, transparent 1px);
+      background-size: 26px 26px;
+      opacity: 0.06;
+    }
+
+    ::selection { background: var(--accent); color: var(--bg); }
+
+    ::-webkit-scrollbar { width: 14px; height: 14px; }
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+      border-left: 2px solid var(--border);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--ink);
+      border: 3px solid var(--bg);
+      border-radius: 0;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 30px 24px 60px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+
+    .ui-switch {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 14px;
+      border: var(--b2);
+      border-radius: var(--r-sm);
+      background: var(--paper);
+      box-shadow: var(--sh-sm);
+    }
+    .ui-switch input { display: none; }
+    .ui-switch .slider {
+      width: 42px;
+      height: 20px;
+      background: var(--soft);
+      border: 2px solid var(--border);
+      border-radius: 999px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+    .ui-switch .slider .circle {
+      position: absolute;
+      top: 50%;
+      left: 2px;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      background: var(--ink);
+      border-radius: 50%;
+      transition: left 0.2s cubic-bezier(.4,0,.2,1), background 0.25s;
+    }
+    .ui-switch input:checked + .slider .circle {
+      left: calc(100% - 18px);
+      background: var(--accent);
+    }
+    .ui-switch .label-text {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .ui-switch input:checked ~ .label-text { color: var(--ink); }
+
+    .brand-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+
+    .brand-icon {
+      width: 56px;
+      height: 56px;
+      display: grid;
+      place-items: center;
+      background: var(--accent);
+      border: var(--b);
+      border-radius: var(--r);
+      box-shadow: var(--sh);
+      color: var(--bg);
+      flex-shrink: 0;
+    }
+    .brand-icon svg {
+      width: 28px;
+      height: 28px;
+      stroke: currentColor;
+      stroke-width: 2.5;
+      fill: none;
+    }
+
+    .brand-text {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 1.5rem;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+    .brand-text span {
+      display: block;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .hero-center {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .hero-center h1 {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: clamp(2rem, 8vw, 2.9rem);
+      font-weight: 400;
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 14px;
+    }
+    .hero-center h1 em {
+      font-style: normal;
+      display: inline-block;
+      padding: 2px 12px 6px;
+      background: var(--accent);
+      color: var(--bg);
+      border: var(--b);
+      border-radius: var(--r-sm);
+      box-shadow: var(--sh);
+      transform: rotate(-2deg);
+    }
+
+    .hero-sub {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .platform-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border: var(--b2);
+      border-radius: var(--r-sm);
+      background: var(--paper);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--ink);
+      box-shadow: var(--sh-sm);
+    }
+    .platform-badge svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+    }
+    .hero-sub .dot {
+      width: 6px;
+      height: 6px;
+      background: var(--muted);
+      border-radius: 50%;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 18px 20px;
+      border: var(--b);
+      border-radius: var(--r);
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.9rem;
+      font-weight: 500;
+      outline: none;
+      resize: none;
+      min-height: 84px;
+      box-shadow: var(--sh);
+      transition: transform 0.12s cubic-bezier(.2,.9,.2,1),
+                  box-shadow 0.12s cubic-bezier(.2,.9,.2,1),
+                  background 0.12s;
+      margin-bottom: 8px;
+    }
+    textarea::placeholder {
+      color: var(--muted);
+      font-weight: 400;
+    }
+    textarea:focus {
+      box-shadow: 5px 5px 0 var(--accent-2);
+    }
+
+    .hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 22px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding-left: 4px;
+    }
+    .hint svg {
+      width: 12px;
+      height: 12px;
+      stroke: currentColor;
+      stroke-width: 2.5;
+      fill: none;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 6px;
+      align-items: stretch;
+    }
+
+    .pill-group {
+      display: flex;
+      border: var(--b);
+      border-radius: var(--r);
+      overflow: hidden;
+      background: var(--paper);
+      box-shadow: var(--sh);
+    }
+
+    .pill {
+      padding: 13px 22px;
+      border: none;
+      border-right: var(--b);
+      background: transparent;
+      color: var(--ink);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 0.76rem;
+      font-weight: 400;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: background 0.12s, color 0.12s;
+    }
+    .pill:last-child { border-right: none; }
+    .pill.active { background: var(--accent); color: var(--bg); }
+    .pill:not(.active):hover { background: var(--soft); }
+
+    .fetch-btn {
+      flex: 1;
+      padding: 13px 22px;
+      border: var(--b);
+      border-radius: var(--r);
+      background: var(--accent-2);
+      color: var(--ink);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 400;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      box-shadow: var(--sh);
+      transition: transform 0.12s cubic-bezier(.2,.9,.2,1),
+                  box-shadow 0.12s cubic-bezier(.2,.9,.2,1),
+                  background 0.12s;
+    }
+    .fetch-btn:hover {
+      background: #FF7A45;
+      transform: translate(2px, 2px);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+    .fetch-btn:active {
+      transform: translate(5px, 5px);
+      box-shadow: 0 0 0 var(--ink);
+    }
+    .fetch-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: var(--sh);
+    }
+
+    .cards { margin-top: 28px; }
+
+    .result-card {
+      border: var(--b);
+      border-radius: var(--r-lg);
+      background: var(--paper);
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: var(--sh-lg);
+      transition: transform 0.14s cubic-bezier(.2,.9,.2,1),
+                  box-shadow 0.14s cubic-bezier(.2,.9,.2,1);
+      animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .result-card:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 5px 5px 0 var(--ink);
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-card .top {
+      display: flex;
+      gap: 14px;
+    }
+
+    .result-card .thumb {
+      width: 130px;
+      min-width: 130px;
+      height: 90px;
+      border-radius: var(--r-sm);
+      border: var(--b2);
+      background: var(--soft);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .result-card .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .result-card .thumb .no-thumb {
+      color: var(--muted);
+    }
+    .result-card .thumb .no-thumb svg {
+      width: 34px;
+      height: 34px;
+      stroke: currentColor;
+      stroke-width: 2.5;
+      fill: none;
+    }
+
+    .result-card .info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .result-card .title {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 0.98rem;
+      font-weight: 400;
+      color: var(--ink);
+      margin-bottom: 8px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+    }
+    .result-card .meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .result-card .meta span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      background: var(--soft);
+      border: 2px solid var(--border);
+      border-radius: var(--r-sm);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .result-card .meta span svg {
+      width: 11px;
+      height: 11px;
+      stroke: currentColor;
+      stroke-width: 2.5;
+      fill: none;
+    }
+
+    .result-card .bottom {
+      border-top: var(--b2);
+      padding-top: 14px;
+      margin-top: 16px;
+    }
+
+    .q-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .q-label svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      stroke-width: 2.5;
+      fill: none;
+    }
+
+    .q-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .q-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      border: var(--b2);
+      border-radius: var(--r-sm);
+      background: var(--paper);
+      cursor: pointer;
+      box-shadow: var(--sh-sm);
+      transition: transform 0.1s cubic-bezier(.2,.9,.2,1),
+                  box-shadow 0.1s cubic-bezier(.2,.9,.2,1),
+                  background 0.12s, border-color 0.12s;
+      min-height: 48px;
+      position: relative;
+    }
+    .q-item:hover {
+      background: var(--soft);
+      transform: translate(1px, 1px);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+    .q-item.active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+    .q-item.active .quality,
+    .q-item.active .size,
+    .q-item.active .icon svg { color: var(--bg); }
+
+    .q-item .left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+    .q-item .icon {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .q-item .icon svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      stroke-width: 2.5;
+      fill: none;
+      color: var(--muted);
+      transition: color 0.12s;
+    }
+    .q-item .quality {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .q-item .size {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .q-item .ring-container {
+      position: relative;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .q-item .ring-container svg {
+      position: absolute;
+      inset: 0;
+      width: 22px;
+      height: 22px;
+      transform: rotate(-90deg);
+      color: var(--ink);
+    }
+    .q-item .ring-bg {
+      fill: none;
+      stroke: var(--border);
+      stroke-width: 2.5;
+    }
+    .q-item .ring-progress {
+      fill: none;
+      stroke: var(--ink);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      stroke-dasharray: 62.8;
+      stroke-dashoffset: 62.8;
+      transition: stroke-dashoffset 0.5s ease, stroke 0.2s;
+    }
+    .q-item .ring-progress.done { stroke: var(--success); }
+    .q-item .ring-progress.error { stroke: var(--error); }
+    .q-item .dl-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+      color: var(--ink);
+    }
+    .q-item .dl-icon svg {
+      width: 11px;
+      height: 11px;
+      stroke: currentColor;
+      stroke-width: 3;
+      fill: none;
+    }
+    .q-item.downloading .ring-progress {
+      stroke-dashoffset: 12;
+      animation: ringPulse 1s ease-in-out infinite;
+    }
+    @keyframes ringPulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    .q-item.done {
+      border-color: var(--success);
+      background: rgba(74, 222, 128, 0.08);
+    }
+    .q-item.done .ring-progress {
+      stroke-dashoffset: 0;
+      stroke: var(--success);
+    }
+    .q-item.done .dl-icon svg { stroke: var(--success); }
+    .q-item.error {
+      border-color: var(--error);
+      background: rgba(255, 59, 48, 0.08);
+    }
+    .q-item.error .ring-progress {
+      stroke-dashoffset: 25;
+      stroke: var(--error);
+    }
+    .q-item.error .dl-icon svg { stroke: var(--error); }
+
+    .result-card.card-error {
+      border-color: var(--error);
+      background: rgba(255, 59, 48, 0.03);
+    }
+    .result-card.card-error .thumb {
+      background: var(--error);
+      border-color: var(--error);
+      color: var(--paper);
+    }
+    .result-card .card-error-msg {
+      font-family: 'DM Mono', monospace;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--error);
+      margin-top: 4px;
+      line-height: 1.4;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .result-card .card-error-url {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      word-break: break-all;
+      margin-top: 6px;
+    }
+
+    .sk-thumb {
+      background: repeating-linear-gradient(
+        -45deg,
+        #1A1A1A 0, #1A1A1A 10px,
+        #2A2A2A 10px, #2A2A2A 20px
+      );
+      background-size: 32px 32px;
+      animation: stripeSlide 0.8s linear infinite;
+    }
+    .sk-line {
+      height: 14px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      background: repeating-linear-gradient(
+        -45deg,
+        #1A1A1A 0, #1A1A1A 10px,
+        #2A2A2A 10px, #2A2A2A 20px
+      );
+      background-size: 32px 32px;
+      animation: stripeSlide 0.8s linear infinite;
+    }
+    .sk-line.w70 { width: 70%; }
+    .sk-line.w40 { width: 40%; height: 12px; }
+    @keyframes stripeSlide {
+      to { background-position: 32px 0; }
+    }
+
+    .dl-all-bar {
+      margin-top: 20px;
+    }
+    .dl-all-btn {
+      width: 100%;
+      padding: 16px;
+      border: var(--b);
+      border-radius: var(--r);
+      background: var(--ink);
+      color: var(--bg);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 400;
+      cursor: pointer;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      box-shadow: 5px 5px 0 var(--accent-2);
+      transition: transform 0.12s cubic-bezier(.2,.9,.2,1),
+                  box-shadow 0.12s cubic-bezier(.2,.9,.2,1);
+    }
+    .dl-all-btn:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 3px 3px 0 var(--accent-2);
+    }
+    .dl-all-btn:active {
+      transform: translate(5px, 5px);
+      box-shadow: 0 0 0 var(--accent-2);
+    }
+    .dl-all-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: 5px 5px 0 var(--accent-2);
+    }
+
+    .footer {
+      position: relative;
+      z-index: 1;
+      margin-top: 90px;
+      padding: 48px 24px 40px;
+      border-top: 3px dashed var(--border);
+    }
+
+    .footer-inner {
+      max-width: 680px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .footer-tagline {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 1.05rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .footer-tagline span {
+      color: var(--accent);
+    }
+
+    .footer-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 26px;
+    }
+
+    .footer-divider {
+      width: 80px;
+      height: 4px;
+      margin: 0 auto 26px;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--ink) 0, var(--ink) 12px,
+        var(--accent) 12px, var(--accent) 24px
+      );
+      border-radius: 0;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 26px;
+    }
+
+    .footer-links a {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 16px;
+      border: var(--b2);
+      border-radius: var(--r-sm);
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 0.68rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+      box-shadow: var(--sh-sm);
+      cursor: pointer;
+      transition: transform 0.1s cubic-bezier(.2,.9,.2,1),
+                  box-shadow 0.1s cubic-bezier(.2,.9,.2,1),
+                  background 0.12s;
+    }
+    .footer-links a:hover {
+      background: var(--accent);
+      color: var(--bg);
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--ink);
+    }
+
+    .footer-social {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 26px;
+    }
+
+    .footer-social a {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: var(--b2);
+      border-radius: var(--r-sm);
+      background: var(--paper);
+      color: var(--ink);
+      text-decoration: none;
+      box-shadow: var(--sh-sm);
+      transition: transform 0.1s cubic-bezier(.2,.9,.2,1),
+                  box-shadow 0.1s cubic-bezier(.2,.9,.2,1),
+                  background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .footer-social a svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+      stroke: none;
+    }
+    .footer-social a:hover {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--ink);
+    }
+    .footer-social .ig:hover { background: #E4405F; color: #FFF; border-color: #E4405F; }
+    .footer-social .fb:hover { background: #1877F2; color: #FFF; border-color: #1877F2; }
+    .footer-social .tg:hover { background: #26A5E4; color: #FFF; border-color: #26A5E4; }
+    .footer-social .gh:hover { background: #FFFFFF; color: #0A0A0A; border-color: #FFFFFF; }
+    .footer-social .yt:hover { background: #FF0000; color: #FFF; border-color: #FF0000; }
+
+    .coffee-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 26px;
+      border: var(--b);
+      border-radius: var(--r);
+      background: var(--accent);
+      color: var(--bg);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+      box-shadow: 5px 5px 0 var(--ink);
+      cursor: pointer;
+      transition: transform 0.12s cubic-bezier(.2,.9,.2,1),
+                  box-shadow 0.12s cubic-bezier(.2,.9,.2,1),
+                  background 0.12s;
+      margin-bottom: 28px;
+    }
+    .coffee-btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2.5;
+      fill: none;
+    }
+    .coffee-btn:hover {
+      background: var(--lime);
+      transform: translate(2px, 2px);
+      box-shadow: 3px 3px 0 var(--ink);
+    }
+    .coffee-btn:active {
+      transform: translate(5px, 5px);
+      box-shadow: 0 0 0 var(--ink);
+    }
+
+    .footer-heart {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .footer-heart .heart {
+      display: inline-block;
+      color: var(--accent-2);
+      animation: pulseHeart 1.6s ease-in-out infinite;
+      font-size: 1rem;
+      line-height: 1;
+    }
+    @keyframes pulseHeart {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.25); }
+    }
+    .footer-heart .name {
+      color: var(--ink);
+      background: var(--accent);
+      padding: 2px 10px 3px;
+      border: var(--b2);
+      border-radius: var(--r-sm);
+      box-shadow: 2px 2px 0 var(--ink);
+    }
+
+    .footer-bottom {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      opacity: 0.75;
+      margin-top: 14px;
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(10, 10, 10, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .modal-overlay.active { display: flex; }
+
+    .modal-box {
+      position: relative;
+      max-width: 560px;
+      width: 100%;
+      max-height: 82vh;
+      overflow-y: auto;
+      padding: 32px 28px;
+      background: var(--paper);
+      border: var(--b);
+      border-radius: var(--r-lg);
+      box-shadow: 10px 10px 0 var(--ink);
+      animation: modalIn 0.25s cubic-bezier(.2,.9,.2,1);
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: translate(-6px, -6px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .modal-title {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .modal-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: var(--b2);
+    }
+    .modal-body {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      color: var(--ink);
+    }
+    .modal-body h4 {
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink);
+      margin-top: 18px;
+      margin-bottom: 6px;
+    }
+    .modal-body h4:first-child { margin-top: 0; }
+    .modal-body p {
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-size: 12.5px;
+    }
+    .modal-body pre {
+      margin: 10px 0;
+      padding: 14px 16px;
+      background: var(--bg);
+      border: var(--b2);
+      border-radius: var(--r-sm);
+      font-family: 'DM Mono', monospace;
+      font-size: 11.5px;
+      color: var(--accent);
+      overflow-x: auto;
+      line-height: 1.6;
+    }
+    .modal-close {
+      margin-top: 24px;
+      padding: 12px 26px;
+      border: var(--b);
+      border-radius: var(--r-sm);
+      background: var(--accent);
+      color: var(--bg);
+      font-family: 'Archivo Black', sans-serif;
+      font-size: 0.72rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: var(--sh-sm);
+      transition: transform 0.1s cubic-bezier(.2,.9,.2,1),
+                  box-shadow 0.1s cubic-bezier(.2,.9,.2,1),
+                  background 0.12s;
+    }
+    .modal-close:hover {
+      background: var(--lime);
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0 var(--ink);
+    }
+    .modal-box::-webkit-scrollbar { width: 6px; }
+    .modal-box::-webkit-scrollbar-track { background: var(--bg); }
+    .modal-box::-webkit-scrollbar-thumb { background: var(--ink); border-radius: 0; }
+
+    @media (max-width: 500px) {
+      .page { padding: 20px 16px 40px; }
+      .brand-icon { width: 48px; height: 48px; }
+      .brand-icon svg { width: 24px; height: 24px; }
+      .brand-text { font-size: 1.15rem; }
+      .hero-center h1 { font-size: clamp(1.6rem, 7vw, 2.2rem); }
+      .controls { flex-wrap: wrap; }
+      .fetch-btn { width: 100%; flex: 0 0 100%; }
+      .result-card .top { flex-direction: column; gap: 12px; }
+      .result-card .thumb { width: 100%; min-width: unset; height: 160px; }
+      .result-card .title { white-space: normal; }
+      .q-grid { grid-template-columns: 1fr; }
+      .footer-social a { width: 40px; height: 40px; }
+      .footer-social a svg { width: 16px; height: 16px; }
+      .footer { padding: 36px 16px 30px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page">
+
+    <div class="top-bar">
+      <label class="ui-switch" title="Toggle theme">
+        <span class="label-text">Dark</span>
+        <input type="checkbox" id="themeToggle" checked>
+        <span class="slider"><span class="circle"></span></span>
+        <span class="label-text">Light</span>
+      </label>
+    </div>
+
+    <div class="brand-left">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div class="brand-text">
+        Video<span>Downloader</span>
+      </div>
+    </div>
+
+    <div class="hero-center">
+      <h1>Download <em>Any</em> Video</h1>
+      <div class="hero-sub">
+        <span class="platform-badge">
+          <svg viewBox="0 0 24 24"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8zM9.5 15.6V8.4L15.8 12z"/></svg>
+          YouTube
+        </span>
+        <span class="dot"></span>
+        <span class="platform-badge">
+          <svg viewBox="0 0 24 24"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.69.24 2.69.24v2.97h-1.52c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/></svg>
+          Facebook
+        </span>
+        <span class="dot"></span>
+        <span class="platform-badge">
+          <svg viewBox="0 0 24 24"><path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.3 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.3 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.3-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.9c.1-1.2.3-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 2.2c-3.1 0-3.5 0-4.7.1-1.1.1-1.7.2-2.1.4-.5.2-.9.4-1.2.7-.4.4-.6.7-.7 1.2-.2.4-.3 1-.4 2.1-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c.1 1.1.2 1.7.4 2.1.2.5.4.9.7 1.2.4.4.7.6 1.2.7.4.2 1 .3 2.1.4 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1.1-.1 1.7-.2 2.1-.4.5-.2.9-.4 1.2-.7.4-.4.6-.7.7-1.2.2-.4.3-1 .4-2.1.1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c-.1-1.1-.2-1.7-.4-2.1-.2-.5-.4-.9-.7-1.2-.4-.4-.7-.6-1.2-.7-.4-.2-1-.3-2.1-.4-1.2-.1-1.6-.1-4.7-.1zm0 3.8a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6zm0 7.9a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2zm6.2-8.1a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0z"/></svg>
+          Instagram
+        </span>
+        <span class="dot"></span>
+        <span class="platform-badge">+1000 more</span>
+      </div>
+    </div>
+
+    <textarea id="urls" placeholder="Paste one or more URLs..." rows="2"></textarea>
+    <p class="hint">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      Multiple links? Separate with spaces, commas, or newlines.
+    </p>
+
+    <div class="controls">
+      <div class="pill-group">
+        <button class="pill active" data-format="video" onclick="setFormat(this)">MP4</button>
+        <button class="pill" data-format="audio" onclick="setFormat(this)">MP3</button>
+      </div>
+      <button class="fetch-btn" id="goBtn" onclick="go()">Fetch</button>
+    </div>
+
+    <div id="cards" class="cards"></div>
+
+  </div>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+      <div class="footer-tagline">Fast · Reliable · <span>Ads Free</span></div>
+      <div class="footer-sub">Built for creators and everyday users</div>
+
+      <div class="footer-divider"></div>
+
+      <div class="footer-links">
+        <a onclick="openModal('docs')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          Docs
+        </a>
+        <a onclick="openModal('privacy')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Privacy
+        </a>
+        <a onclick="openModal('terms')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Terms
+        </a>
+        <a onclick="openModal('support')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+          Support
+        </a>
+      </div>
+
+      <div class="footer-social">
+        <a href="https://instagram.com/raihan_rifat007" target="_blank" rel="noopener noreferrer" class="ig" aria-label="Instagram">
+          <svg viewBox="0 0 24 24"><path d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.8.3 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.3 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.8-.3-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2-.1-1.3-.1-1.7-.1-4.9s0-3.6.1-4.9c.1-1.2.3-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4 1.3-.1 1.7-.1 4.9-.1zm0 2.2c-3.1 0-3.5 0-4.7.1-1.1.1-1.7.2-2.1.4-.5.2-.9.4-1.2.7-.4.4-.6.7-.7 1.2-.2.4-.3 1-.4 2.1-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c.1 1.1.2 1.7.4 2.1.2.5.4.9.7 1.2.4.4.7.6 1.2.7.4.2 1 .3 2.1.4 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1.1-.1 1.7-.2 2.1-.4.5-.2.9-.4 1.2-.7.4-.4.6-.7.7-1.2.2-.4.3-1 .4-2.1.1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c-.1-1.1-.2-1.7-.4-2.1-.2-.5-.4-.9-.7-1.2-.4-.4-.7-.6-1.2-.7-.4-.2-1-.3-2.1-.4-1.2-.1-1.6-.1-4.7-.1zm0 3.8a4.8 4.8 0 1 1 0 9.6 4.8 4.8 0 0 1 0-9.6zm0 7.9a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2zm6.2-8.1a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0z"/></svg>
+        </a>
+        <a href="https://facebook.com/raihan_rifat007" target="_blank" rel="noopener noreferrer" class="fb" aria-label="Facebook">
+          <svg viewBox="0 0 24 24"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.69.24 2.69.24v2.97h-1.52c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/></svg>
+        </a>
+        <a href="https://t.me/raihan_rifat007" target="_blank" rel="noopener noreferrer" class="tg" aria-label="Telegram">
+          <svg viewBox="0 0 24 24"><path d="M11.94 0C5.35 0 0 5.35 0 11.94c0 6.59 5.35 11.94 11.94 11.94 6.59 0 11.94-5.35 11.94-11.94C23.88 5.35 18.53 0 11.94 0zm5.86 8.16l-1.97 9.28c-.15.66-.54.82-1.09.51l-3.02-2.23-1.46 1.4c-.16.16-.3.3-.61.3l.21-3.06 5.55-5.01c.24-.21-.05-.33-.37-.12l-6.86 4.32-2.95-.92c-.64-.2-.65-.64.13-.95l11.53-4.44c.53-.2 1 .13.83 1.02z"/></svg>
+        </a>
+        <a href="https://github.com/Professor-Bot07" target="_blank" rel="noopener noreferrer" class="gh" aria-label="GitHub">
+          <svg viewBox="0 0 24 24"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.7-2.8 5.7-5.5 6 .4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3z"/></svg>
+        </a>
+        <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" class="yt" aria-label="YouTube">
+          <svg viewBox="0 0 24 24"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31.4 31.4 0 0 0 0 12a31.4 31.4 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31.4 31.4 0 0 0 24 12a31.4 31.4 0 0 0-.5-5.8zM9.5 15.6V8.4L15.8 12z"/></svg>
+        </a>
+      </div>
+
+      <a href="https://ko-fi.com/raihan07" target="_blank" rel="noopener noreferrer" class="coffee-btn">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+        Buy me a coffee
+      </a>
+
+      <div class="footer-heart">
+        Built with
+        <span class="heart">&hearts;</span>
+        by
+        <span class="name">raihan07</span>
+      </div>
+
+      <div class="footer-bottom">&copy; 2026 Video Downloader · All rights reserved</div>
+
+    </div>
+  </footer>
+
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+    <div class="modal-box" id="modalBox">
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script>
+    const toggleCheckbox = document.getElementById('themeToggle');
+
+    function toggleTheme() {
+      const isLight = toggleCheckbox.checked;
+      document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+      localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    }
+
+    toggleCheckbox.addEventListener('change', toggleTheme);
+
+    (function loadTheme() {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'light') {
+        toggleCheckbox.checked = true;
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        toggleCheckbox.checked = false;
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+
+    function openModal(type) {
+      const overlay = document.getElementById('modalOverlay');
+      const content = document.getElementById('modalContent');
+      overlay.classList.add('active');
+
+      const data = {
+        docs: {
+          title: 'API Documentation',
+          sub: 'Video Downloader REST API',
+          body: `
+            <h4>POST /api/info</h4>
+            <p>Fetch video metadata and available formats.</p>
+            <pre>{ "title": "Video Title", "duration": 212, "uploader": "Channel", "formats": [ { "id": "137", "label": "1080p" } ] }</pre>
+            <h4>POST /api/download</h4>
+            <p>Start a download job. Returns a <code>job_id</code> for tracking.</p>
+            <pre>{ "job_id": "a1b2c3d4e5" }</pre>
+            <h4>GET /api/status/:job_id</h4>
+            <p>Poll the job state. Possible values: <code>downloading</code>, <code>done</code>, <code>error</code>.</p>
+            <h4>GET /api/file/:job_id</h4>
+            <p>Stream the completed file as an attachment.</p>
+          `
+        },
+        privacy: {
+          title: 'Privacy Policy',
+          sub: 'Your data is safe with us',
+          body: `
+            <h4>Data Collection</h4>
+            <p>We do not collect, store, or share any personal data. All downloads are processed in real-time and no logs are kept.</p>
+            <h4>Cookies</h4>
+            <p>We only use essential local storage for the theme preference. No tracking or analytics cookies are used.</p>
+            <h4>Third-Party Sharing</h4>
+            <p>No data is shared with any third-party services.</p>
+            <h4>Your Rights</h4>
+            <p>You have the right to use this service anonymously. No account or registration is required.</p>
+          `
+        },
+        terms: {
+          title: 'Terms of Service',
+          sub: 'Please read before using',
+          body: `
+            <h4>Acceptance</h4>
+            <p>By using this service, you agree to these terms.</p>
+            <h4>Fair Use</h4>
+            <p>This tool is for personal and educational use only. Commercial use is prohibited.</p>
+            <h4>Content Responsibility</h4>
+            <p>Users are responsible for the content they download. We do not host or store any copyrighted material.</p>
+            <h4>Service Availability</h4>
+            <p>We aim for high uptime but do not guarantee uninterrupted service.</p>
+            <h4>Changes</h4>
+            <p>We reserve the right to update these terms at any time.</p>
+          `
+        },
+        support: {
+          title: 'Support',
+          sub: 'Get help and contribute',
+          body: `
+            <h4>Report a bug</h4>
+            <p>Found something broken? Open an issue on our GitHub repository.</p>
+            <h4>Feature requests</h4>
+            <p>Have a feature idea? Reach out on Telegram or GitHub discussions.</p>
+            <h4>Community</h4>
+            <p>Join the Telegram channel for updates, tips, and community support.</p>
+            <h4>Donate</h4>
+            <p>If this tool helps you, consider buying the maintainer a coffee.</p>
+          `
+        }
+      };
+
+      const d = data[type];
+      content.innerHTML = `
+        <div class="modal-title">${d.title}</div>
+        <div class="modal-sub">${d.sub}</div>
+        <div class="modal-body">${d.body}</div>
+        <button class="modal-close" onclick="closeModal()">Close</button>
+      `;
+    }
+
+    function closeModal(e) {
+      if (e && e.target !== e.currentTarget) return;
+      document.getElementById('modalOverlay').classList.remove('active');
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    let currentFormat = 'video';
+    let cardData = [];
+
+    function setFormat(btn) {
+      document.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFormat = btn.dataset.format;
+    }
+
+    function parseUrls(text) {
+      return [...new Set(text.split(/[\s,]+/).map(u => u.trim()).filter(u => u.startsWith('http')))];
+    }
+
+    function fmtDur(s) {
+      if (!s) return '';
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60);
+      return `${m}:${sec.toString().padStart(2, '0')}`;
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function friendlyError(err) {
+      if (err.includes('Unsupported URL')) return 'This URL is not supported';
+      if (err.includes('Video unavailable')) return 'Video is unavailable or private';
+      if (err.includes('Private video')) return 'This video is private';
+      if (err.includes('HTTP Error 403')) return 'Access denied by the platform';
+      if (err.includes('HTTP Error 404')) return 'Video not found';
+      if (err.includes('copyright')) return 'Video blocked due to copyright';
+      if (err.includes('geo')) return 'Video not available in your region';
+      if (err.includes('timed out') || err.includes('Timed out')) return 'Request timed out — try again';
+      if (err.includes('network') || err.includes('Network')) return 'Network error — check your connection';
+      return err.length > 80 ? err.slice(0, 80) + '...' : err;
+    }
+
+    document.getElementById('urls').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); go(); }
+    });
+
+    async function go() {
+      const urls = parseUrls(document.getElementById('urls').value);
+      if (!urls.length) return;
+
+      const btn = document.getElementById('goBtn');
+      const container = document.getElementById('cards');
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      container.innerHTML = '';
+      cardData = [];
+
+      for (let i = 0; i < urls.length; i++) {
+        if (urls[i].includes('list=')) {
+          try {
+            const res = await fetch('/api/playlist', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: urls[i] }),
+            });
+            const data = await res.json();
+            if (data.urls) {
+              urls.splice(i, 1, ...data.urls);
+            }
+          } catch (_) {}
+        }
+      }
+
+      for (let i = 0; i < urls.length; i++) {
+        const url = urls[i];
+        const idx = cardData.length;
+        cardData.push({ url, status: 'loading' });
+        renderCard(idx);
+
+        try {
+          const res = await fetch('/api/info', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+          });
+          const data = await res.json();
+          if (data.error) {
+            cardData[idx] = { ...cardData[idx], status: 'info-error', error: data.error };
+          } else {
+            const formats = (data.formats || []).map(f => ({
+              id: f.id || f.format_id || f.quality,
+              label: f.label || f.quality || f.ext || 'Unknown',
+              size: f.size || '',
+              ext: f.ext || 'mp4'
+            }));
+            cardData[idx] = {
+              ...cardData[idx],
+              status: 'ready',
+              title: data.title || '',
+              thumbnail: data.thumbnail || '',
+              duration: data.duration,
+              uploader: data.uploader || '',
+              formats: formats,
+              selectedFormatId: formats.length ? formats[0].id : null,
+              jobId: null,
+              filename: null
+            };
+          }
+        } catch (err) {
+          cardData[idx] = { ...cardData[idx], status: 'info-error', error: err.message };
+        }
+        renderCard(idx);
+      }
+
+      if (cardData.filter(c => c.status === 'ready').length > 1) {
+        renderDownloadAll();
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Fetch';
+    }
+
+    function renderCard(idx) {
+      const c = cardData[idx];
+      let el = document.getElementById(`card-${idx}`);
+      if (!el) {
+        el = document.createElement('div');
+        el.id = `card-${idx}`;
+        el.className = 'result-card';
+        document.getElementById('cards').appendChild(el);
+      }
+
+      if (c.status === 'loading') {
+        el.className = 'result-card';
+        el.innerHTML = `
+          <div class="top">
+            <div class="thumb sk-thumb"></div>
+            <div class="info">
+              <div class="sk-line w70"></div>
+              <div class="sk-line w40"></div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (c.status === 'info-error') {
+        el.className = 'result-card card-error';
+        el.innerHTML = `
+          <div class="top">
+            <div class="thumb">
+              <div class="no-thumb">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+              </div>
+            </div>
+            <div class="info">
+              <div class="title" style="color:var(--error)">Could not fetch video</div>
+              <div class="card-error-msg">${esc(friendlyError(c.error || ''))}</div>
+              <div class="card-error-url">${esc(c.url)}</div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      el.className = 'result-card';
+      const isAudio = currentFormat === 'audio';
+
+      let thumbHtml;
+      if (isAudio) {
+        thumbHtml = `<div class="no-thumb"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
+      } else if (c.thumbnail) {
+        thumbHtml = `<img src="${c.thumbnail}" alt="">`;
+      } else {
+        thumbHtml = `<div class="no-thumb"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>`;
+      }
+
+      let metaParts = [];
+      if (c.uploader) metaParts.push(`<span><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>${esc(c.uploader)}</span>`);
+      if (c.duration) metaParts.push(`<span><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${fmtDur(c.duration)}</span>`);
+      if (metaParts.length === 0) metaParts.push(`<span><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/></svg>Media</span>`);
+
+      let qGrid = '';
+      if (c.formats && c.formats.length) {
+        const items = c.formats.map(f => {
+          const isActive = f.id === c.selectedFormatId;
+          const sizeHtml = f.size ? `<span class="size">${esc(f.size)}</span>` : '';
+          const iconPath = isAudio
+            ? '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'
+            : '<path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2"/>';
+          return `
+            <div class="q-item${isActive ? ' active' : ' idle'}" data-idx="${idx}" data-fid="${esc(f.id)}" onclick="startDownload(${idx}, '${esc(f.id)}')">
+              <div class="left">
+                <span class="icon"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg></span>
+                <span class="quality">${esc(f.label)}</span>
+                ${sizeHtml}
+              </div>
+              <div class="ring-container">
+                <svg viewBox="0 0 24 24">
+                  <circle class="ring-bg" cx="12" cy="12" r="10"/>
+                  <circle class="ring-progress" cx="12" cy="12" r="10"/>
+                </svg>
+                <span class="dl-icon">
+                  <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                </span>
+              </div>
+            </div>
+          `;
+        }).join('');
+        qGrid = `
+          <div class="bottom">
+            <div class="q-label">
+              <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Click to download
+            </div>
+            <div class="q-grid">${items}</div>
+          </div>
+        `;
+      } else {
+        qGrid = `<div class="bottom"><div class="q-label" style="color:var(--muted);">No formats available</div></div>`;
+      }
+
+      el.innerHTML = `
+        <div class="top">
+          <div class="thumb">${thumbHtml}</div>
+          <div class="info">
+            <div class="title">${esc(c.title || 'Untitled')}</div>
+            <div class="meta">${metaParts.join('')}</div>
+          </div>
+        </div>
+        ${qGrid}
+      `;
+    }
+
+    function renderDownloadAll() {
+      const existing = document.getElementById('dl-all-bar');
+      if (existing) existing.remove();
+
+      const bar = document.createElement('div');
+      bar.id = 'dl-all-bar';
+      bar.className = 'dl-all-bar';
+      bar.innerHTML = `<button class="dl-all-btn" onclick="dlAll()">Download All</button>`;
+      document.getElementById('cards').appendChild(bar);
+    }
+
+    function getQItem(idx, fid) {
+      const el = document.getElementById(`card-${idx}`);
+      if (!el) return null;
+      return el.querySelector(`.q-item[data-idx="${idx}"][data-fid="${fid}"]`);
+    }
+
+    function getRing(el) {
+      if (!el) return null;
+      return el.querySelector('.ring-progress');
+    }
+
+    function getIcon(el) {
+      if (!el) return null;
+      return el.querySelector('.dl-icon svg');
+    }
+
+    function resetQItem(el) {
+      if (!el) return;
+      el.classList.remove('downloading', 'done', 'error');
+      el.classList.add('idle');
+      const ring = getRing(el);
+      if (ring) {
+        ring.style.strokeDashoffset = '62.8';
+        ring.classList.remove('done', 'error');
+      }
+      const icon = getIcon(el);
+      if (icon) icon.innerHTML = '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>';
+    }
+
+    function startDownload(idx, formatId) {
+      const c = cardData[idx];
+      if (!c || c.status !== 'ready') return;
+
+      const el = getQItem(idx, formatId);
+      if (!el || el.classList.contains('downloading')) return;
+
+      const allItems = document.getElementById(`card-${idx}`)?.querySelectorAll('.q-item');
+      if (allItems) {
+        allItems.forEach(item => {
+          if (item !== el) {
+            resetQItem(item);
+          }
+        });
+      }
+
+      resetQItem(el);
+      el.classList.remove('idle');
+      el.classList.add('downloading');
+
+      const ring = getRing(el);
+      const icon = getIcon(el);
+      if (ring) ring.style.strokeDashoffset = '12';
+      if (icon) icon.innerHTML = '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>';
+
+      c.selectedFormatId = formatId;
+      c.status = 'downloading';
+      c.error = null;
+
+      (async () => {
+        try {
+          const res = await fetch('/api/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url: c.url,
+              format: currentFormat,
+              format_id: formatId,
+              title: c.title || '',
+            }),
+          });
+          const data = await res.json();
+          if (data.error) {
+            c.status = 'error';
+            c.error = data.error;
+            el.classList.remove('downloading');
+            el.classList.add('error');
+            if (ring) { ring.style.strokeDashoffset = '25'; ring.classList.add('error'); }
+            if (icon) icon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>';
+            return;
+          }
+          c.jobId = data.job_id;
+          pollDownload(idx, formatId);
+        } catch (err) {
+          c.status = 'error';
+          c.error = err.message;
+          el.classList.remove('downloading');
+          el.classList.add('error');
+          if (ring) { ring.style.strokeDashoffset = '25'; ring.classList.add('error'); }
+          if (icon) icon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>';
+        }
+      })();
+    }
+
+    function pollDownload(idx, formatId) {
+      const c = cardData[idx];
+      const el = getQItem(idx, formatId);
+      if (!el) return;
+
+      const ring = getRing(el);
+      const icon = getIcon(el);
+      let progress = 0;
+
+      const iv = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/status/${c.jobId}`);
+          const data = await res.json();
+
+          if (data.status === 'done') {
+            clearInterval(iv);
+            c.status = 'done';
+            c.filename = data.filename;
+
+            if (el) {
+              el.classList.remove('downloading');
+              el.classList.add('done');
+              if (ring) { ring.style.strokeDashoffset = '0'; ring.classList.add('done'); }
+              if (icon) icon.innerHTML = '<polyline points="20 6 9 17 4 12"/>';
+            }
+
+            saveCard(idx);
+
+            setTimeout(() => {
+              if (el) {
+                el.classList.remove('done');
+                el.classList.add('idle');
+                if (ring) { ring.style.strokeDashoffset = '62.8'; ring.classList.remove('done'); }
+                if (icon) icon.innerHTML = '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>';
+              }
+            }, 3000);
+          } else if (data.status === 'error') {
+            clearInterval(iv);
+            c.status = 'error';
+            c.error = data.error;
+
+            if (el) {
+              el.classList.remove('downloading');
+              el.classList.add('error');
+              if (ring) { ring.style.strokeDashoffset = '25'; ring.classList.add('error'); }
+              if (icon) icon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>';
+            }
+          } else {
+            progress += Math.random() * 4 + 1;
+            if (progress > 90) progress = 90;
+            const offset = 62.8 - (62.8 * progress / 100);
+            if (ring) ring.style.strokeDashoffset = offset;
+          }
+        } catch {
+          clearInterval(iv);
+          c.status = 'error';
+          c.error = 'Lost connection to server';
+
+          if (el) {
+            el.classList.remove('downloading');
+            el.classList.add('error');
+            if (ring) { ring.style.strokeDashoffset = '25'; ring.classList.add('error'); }
+            if (icon) icon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>';
+          }
+        }
+      }, 600);
+    }
+
+    function saveCard(idx) {
+      const c = cardData[idx];
+      if (!c.jobId) return;
+      const a = document.createElement('a');
+      a.href = `/api/file/${c.jobId}`;
+      a.download = c.filename || '';
+      a.click();
+    }
+
+    async function dlAll() {
+      const btn = document.querySelector('.dl-all-btn');
+      if (btn) { btn.disabled = true; btn.textContent = 'Downloading...'; }
+
+      for (let i = 0; i < cardData.length; i++) {
+        if (cardData[i].status === 'ready' && cardData[i].formats && cardData[i].formats.length) {
+          const fid = cardData[i].selectedFormatId || cardData[i].formats[0]?.id;
+          if (fid) {
+            await new Promise((resolve) => {
+              startDownload(i, fid);
+              const checkDone = setInterval(() => {
+                const c = cardData[i];
+                if (c.status === 'done' || c.status === 'error') {
+                  clearInterval(checkDone);
+                  resolve();
+                }
+              }, 300);
+            });
+          }
+        }
+      }
+
+      if (btn) { btn.disabled = false; btn.textContent = 'Download All'; }
+    }
+  </script>
+</body>
+</html>
