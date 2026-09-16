@@ -14,13 +14,13 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY . .
 
-RUN useradd -m -u 1000 reclip && \
+RUN useradd -m -u 1000 videodownloader && \
     mkdir -p /app/downloads && \
-    chown -R reclip:reclip /app
-USER reclip
+    chown -R videodownloader:videodownloader /app
 
-# Put the reclip user's --user installs first so startup yt-dlp updates take effect.
-ENV PATH=/home/reclip/.local/bin:$PATH
+USER videodownloader
+
+ENV PATH=/home/videodownloader/.local/bin:$PATH
 
 EXPOSE 8899
 
