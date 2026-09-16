@@ -2,7 +2,6 @@
 set -e
 cd "$(dirname "$0")"
 
-# Check prerequisites
 missing=""
 
 if ! command -v python3 &> /dev/null; then
@@ -30,7 +29,6 @@ if [ -n "$missing" ]; then
     exit 1
 fi
 
-# Set up venv and install Python deps
 if [ ! -d "venv" ]; then
     echo "Setting up virtual environment..."
     python3 -m venv venv
@@ -40,9 +38,7 @@ else
     source venv/bin/activate
 fi
 
-# Keep yt-dlp fresh — sites (Instagram, Facebook, etc.) break its extractors
-# frequently, and the usual fix is simply updating yt-dlp. Skip with RECLIP_NO_UPDATE=1.
-if [ -z "$RECLIP_NO_UPDATE" ]; then
+if [ -z "$VIDEODOWNLOADER_NO_UPDATE" ]; then
     echo "Updating yt-dlp..."
     pip install -q -U yt-dlp || echo "  (couldn't update yt-dlp — continuing with the installed version)"
 fi
@@ -51,6 +47,6 @@ PORT="${PORT:-8899}"
 export PORT
 
 echo ""
-echo "  ReClip is running at http://localhost:$PORT"
+echo "  Video Downloader is running at http://localhost:$PORT"
 echo ""
 python3 app.py
