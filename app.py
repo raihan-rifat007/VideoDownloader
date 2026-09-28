@@ -12,7 +12,6 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 jobs = {}
 
-
 def parse_ytdlp_json(stdout):
     for line in stdout.splitlines():
         line = line.strip()
@@ -20,7 +19,6 @@ def parse_ytdlp_json(stdout):
             continue
         return json.loads(line)
     raise ValueError("yt-dlp returned no data")
-
 
 def run_download(job_id, url, format_choice, format_id):
     job = jobs[job_id]
@@ -80,11 +78,9 @@ def run_download(job_id, url, format_choice, format_id):
         job["status"] = "error"
         job["error"] = str(e)
 
-
 @app.route("/")
 def index():
     return render_template("index.html")
-
 
 @app.route("/api/info", methods=["POST"])
 def get_info():
@@ -130,7 +126,6 @@ def get_info():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-
 @app.route("/api/playlist", methods=["POST"])
 def get_playlist_info():
     data = request.json
@@ -153,7 +148,6 @@ def get_playlist_info():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-
 @app.route("/api/download", methods=["POST"])
 def start_download():
     data = request.json
@@ -174,7 +168,6 @@ def start_download():
 
     return jsonify({"job_id": job_id})
 
-
 @app.route("/api/status/<job_id>")
 def check_status(job_id):
     job = jobs.get(job_id)
@@ -186,14 +179,12 @@ def check_status(job_id):
         "filename": job.get("filename"),
     })
 
-
 @app.route("/api/file/<job_id>")
 def download_file(job_id):
     job = jobs.get(job_id)
     if not job or job["status"] != "done":
         return jsonify({"error": "File not ready"}), 404
     return send_file(job["file"], as_attachment=True, download_name=job["filename"])
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8899))
